@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Virtual Interview Practice</h1>
+    
+    <div id="interview-setup" class="card p-4 mb-4">
+        <h2>Start a Practice Interview</h2>
+        <div class="mb-3">
+            <label for="job-role" class="form-label">Select Job Role</label>
+            <select class="form-select" id="job-role">
+                {% for role in job_roles %}
+                <option value="{{ role.id }}">{{ role.role_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="mb-3">
+            <label for="skill-area" class="form-label">Select Skill Area to Focus On</label>
+            <select class="form-select" id="skill-area">
+                {% if skills and skills.proficientSkills %}
+                    {% for skill in skills.proficientSkills %}
+                    <option value="{{ skill }}">{{ skill }}</option>
+                    {% endfor %}
+                {% endif %}
+                <option value="JavaScript">JavaScript</option>
+                <option value="Python">Python</option>
+                <option value="Java">Java</option>
+                <option value="Data Structures">Data Structures</option>
+                <option value="Algorithms">Algorithms</option>
+                <option value="React">React</option>
+                <option value="Node.js">Node.js</option>
+                <option value="SQL">SQL</option>
+                <option value="System Design">System Design</option>
+            </select>
+        </div>
+        
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="use-voice" checked>
+            <label class="form-check-label" for="use-voice">
+                Enable Voice Recognition (speak your answers)
+            </label>
+        </div>
+        
+        <button id="start-interview" class="btn btn-primary">Start Interview</button>
+    </div>
+    
+    <div id="interview-in-progress" class="card p-4 mb-4" style="display: none;">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="interviewer-avatar">
+                    <img src="/static/images/interview.png" alt="AI Interviewer" class="img-fluid rounded-circle mb-3">
+                    <h3 id="interviewer-name">Technical Interviewer</h3>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div id="interview-conversation" style="height: 400px; overflow-y: scroll;" class="mb-4">
+                    <div id="greeting" class="alert alert-info"></div>
+                    
+                    <div id="qa-container">
+                        <!-- Q&A pairs will be added here dynamically -->
+                    </div>
+                    
+                    <div id="current-question-container" class="mb-3">
+                        <div id="current-question" class="alert alert-primary"></div>
+                        
+                        <div id="answer-input-container">
+                            <div class="mb-3">
+                                <label for="answer-text" class="form-label">Your Answer:</label>
+                                <textarea class="form-control" id="answer-text" rows="4"></textarea>
+                            </div>
+                            
+                            <div id="speech-controls" class="mb-3">
+                                <button id="start-recording" class="btn btn-outline-primary">
+                                    <i class="bi bi-mic"></i> Start Speaking
+                                </button>
+                                <button id="stop-recording" class="btn btn-outline-danger" style="display: none;">
+                                    <i class="bi bi-mic-mute"></i> Stop Speaking
+                                </button>
+                                <div id="recording-status" class="badge bg-secondary mt-2" style="display: none;">
+                                    Listening...
+                                </div>
+                            </div>
+                            
+                            <button id="submit-answer" class="btn btn-primary">Submit Answer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="interview-results" class="card p-4" style="display: none;">
+        <h2>Interview Results</h2>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Technical Skills</div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div id="technical-score" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Communication</div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div id="communication-score" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Strengths</div>
+                    <div class="card-body">
+                        <ul id="strengths-list" class="list-group list-group-flush">
+                            <!-- Strengths will be added here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Areas for Improvement</div>
+                    <div class="card-body">
+                        <ul id="improvements-list" class="list-group list-group-flush">
+                            <!-- Improvements will be added here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">Overall Feedback</div>
+            <div class="card-body">
+                <p id="overall-feedback"></p>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">Recommended Next Steps</div>
+            <div class="card-body">
+                <ul id="next-steps-list" class="list-group list-group-flush">
+                    <!-- Next steps will be added here -->
+                </ul>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-between">
+            <button id="new-interview" class="btn btn-primary">Start New Interview</button>
+            <button id="save-results" class="btn btn-success">Save Results to Profile</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/virtual_interview.js') }}"></script>
+{% endblock %}

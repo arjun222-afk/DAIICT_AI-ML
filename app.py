@@ -12,6 +12,14 @@ from dotenv import load_dotenv
 import os
 from ai_utils import get_resume_tips, get_interview_tips, format_tips_html
 import markdown
+# from interview_utils import generate_initial_interview_questions, generate_follow_up_question, generate_interview_analysis
+from interview_utils import (
+    get_db_connection,
+    generate_initial_interview_questions,
+    generate_follow_up_question,
+    generate_interview_analysis
+)
+
 
 load_dotenv()
 
@@ -101,20 +109,16 @@ def salary_distribution():
             salary_ranges["Not Specified"] += 1
             continue
         
-        # Extract numbers from salary text
         numbers = re.findall(r'\d+', salary_text)
         if not numbers:
             salary_ranges["Not Specified"] += 1
             continue
         
-        # Convert to integer, assuming the largest number is the max salary
         try:
             max_salary = max(int(num) for num in numbers)
-            # Check if it's in thousands or actual value
-            if max_salary < 1000:  # Assuming it's in thousands (e.g., 75 means 75k)
+            if max_salary < 1000:
                 max_salary *= 1000
                 
-            # Categorize
             if max_salary <= 50000:
                 salary_ranges["0-50k"] += 1
             elif max_salary <= 75000:
@@ -141,7 +145,6 @@ def experience_required():
     experience_data = cursor.fetchall()
     conn.close()
     
-    # Process the experience data
     exp_ranges = {
         "Entry Level (0-2 years)": 0,
         "Mid Level (3-5 years)": 0,
@@ -156,17 +159,14 @@ def experience_required():
             exp_ranges["Not Specified"] += 1
             continue
         
-        # Extract numbers from experience text
         numbers = re.findall(r'\d+', exp_text)
         if not numbers:
             exp_ranges["Not Specified"] += 1
             continue
         
-        # Convert to integer, assuming the largest number is the max experience
         try:
             max_exp = max(int(num) for num in numbers)
             
-            # Categorize
             if max_exp <= 2:
                 exp_ranges["Entry Level (0-2 years)"] += 1
             elif max_exp <= 5:
@@ -204,13 +204,11 @@ def job_posting_trends():
     posting_dates = cursor.fetchall()
     conn.close()
     
-    # Process the dates
     date_counts = {}
     
     for row in posting_dates:
         date_text = row['Posted_on']
         try:
-            # Try different date formats
             date_formats = [
                 "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", 
                 "%B %d, %Y", "%d %B %Y", "%Y/%m/%d"
@@ -257,7 +255,6 @@ def job_search():
         query += " AND job_location LIKE ?"
         params.append(f"%{location}%")
     
-    # Limit results for performance
     query += " LIMIT 100"
     
     cursor = conn.cursor()
@@ -265,7 +262,6 @@ def job_search():
     results = cursor.fetchall()
     conn.close()
     
-    # Convert to list of dicts
     jobs = []
     for row in results:
         job = dict(row)
@@ -278,19 +274,15 @@ def market_summary():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Total job count
     cursor.execute("SELECT COUNT(*) as total FROM job_market_data")
     total_jobs = cursor.fetchone()['total']
     
-    # Count unique companies
     cursor.execute("SELECT COUNT(DISTINCT company) as company_count FROM job_market_data")
     company_count = cursor.fetchone()['company_count']
     
-    # Count unique locations
     cursor.execute("SELECT COUNT(DISTINCT job_location) as location_count FROM job_market_data")
     location_count = cursor.fetchone()['location_count']
     
-    # Average salary calculation (simplified)
     cursor.execute("SELECT AVG(company_rating) as avg_rating FROM job_market_data WHERE company_rating IS NOT NULL")
     avg_rating = cursor.fetchone()['avg_rating']
     
@@ -303,12 +295,10 @@ def market_summary():
         "average_company_rating": round(avg_rating, 2) if avg_rating else 0
     })
 
-# Updated quiz questions endpoint to fetch from database
 @app.route('/api/quiz')
 def quiz_questions():
     category = request.args.get('category', 'technical')
     
-    # Connect to database and fetch questions
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -318,7 +308,6 @@ def quiz_questions():
     rows = cursor.fetchall()
     conn.close()
     
-    # Format questions for API response
     questions = []
     for row in rows:
         questions.append({
@@ -329,7 +318,6 @@ def quiz_questions():
             "skill": row['skill']
         })
     
-    # If no questions found in database, use fallback questions
     if not questions:
         if category == 'technical':
             questions = [
@@ -340,7 +328,6 @@ def quiz_questions():
                     "correctAnswer": "JavaScript",
                     "skill": "front_end"
                 },
-                # Additional fallback technical questions...
             ]
         else:
             questions = [
@@ -356,7 +343,6 @@ def quiz_questions():
     
     return jsonify(questions)
 
-# Enhanced version of submit_quiz_results endpoint
 @app.route('/api/submit_quiz_results', methods=['POST'])
 def submit_quiz_results():
     data = request.json
@@ -367,14 +353,12 @@ def submit_quiz_results():
     session_user_id = session.get('user_id')
     data_user_id = data.get('user_id')
 
-    # Use session user_id if available and different from data
     if session_user_id and (not data_user_id or data_user_id != session_user_id):
         user_id = session_user_id
         print(f"Using session user_id: {user_id} instead of data user_id: {data_user_id}")
     else:
         user_id = data_user_id
     
-    # Validate user_id
     if not user_id:
         return jsonify({"error": "No user ID provided"}), 400
         
@@ -382,7 +366,6 @@ def submit_quiz_results():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Ensure proficient_skills and improvement_skills are JSON strings
         proficient_skills = data.get('proficientSkills', [])
         improvement_skills = data.get('improvementSkills', [])
         
@@ -392,7 +375,6 @@ def submit_quiz_results():
         if isinstance(improvement_skills, list):
             improvement_skills = json.dumps(improvement_skills)
         
-        # Insert quiz results into database
         cursor.execute("""
             INSERT INTO user_quiz_results 
             (user_id, category, proficient_skills, improvement_skills, score, completed_at) 
@@ -419,82 +401,62 @@ def submit_quiz_results():
         return jsonify({"error": str(e)}), 500
 
 
-# Add a secret key for session management
-# app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 app.secret_key = os.environ.get('SECRET_KEY')
 
-# In app.py - Update the signup route
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        # Process the signup form
         email = request.form.get('email')
         password = request.form.get('password')
         name = request.form.get('name')
         
-        # Get stored skills from the form
         user_skills = request.form.get('user_skills', '{}')
         
-        # Register the user
         user_id, error = register_user(name, email, password, user_skills)
         
         if error:
             flash(error, 'danger')
-            return render_template('signup.html')  # This line is correct but missing flash messages in template
+            return render_template('signup.html') 
         
-        # Set user session
         session['user_id'] = user_id
         session['user_email'] = email
         
-        # Redirect to dashboard
         return redirect('/dashboard')
     
-    # GET request - show signup form
     return render_template('signup.html')
 
-# Add login route
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
         
-        # Authenticate user
         user_id, error = login_user(email, password)
         
         if error:
             flash(error, 'danger')
             return render_template('login.html')
         
-        # Get user info
         user = get_user_by_id(user_id)
         
-        # Set session - this is critical
         session['user_id'] = user_id
         session['user_email'] = email
         
-        # Redirect to dashboard
         return redirect('/dashboard')
     
-    # GET request - show login form
     return render_template('login.html')
 
-# Add logout route
 @app.route('/logout')
 def logout():
-    # Clear session
     session.clear()
     return redirect('/')
 
-# Add dashboard route
-# Add dashboard route
+# Update to the dashboard route in app.py
 @app.route('/dashboard')
 def dashboard():
-    # Check if user is logged in
     if 'user_id' not in session:
         return redirect('/login')
     
-    # Get user information
     user_id = session['user_id']
     user = get_user_by_id(user_id)
     
@@ -502,10 +464,24 @@ def dashboard():
         session.clear()
         return redirect('/login')
     
-    # Get user's quiz results
     quiz_results = get_user_quiz_results(user_id)
-    # print(quiz_results)
-    # Process skills data
+    
+    # Get interview history
+    interview_history = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT * FROM user_interview_results 
+               WHERE user_id = ? 
+               ORDER BY completed_at DESC LIMIT 5""",
+            (user_id,)
+        )
+        interview_history = cursor.fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"Error fetching interview history: {e}")
+    
     skills_data = {}
     try:
         if user['skills_data'] and user['skills_data'].strip():
@@ -514,37 +490,17 @@ def dashboard():
         print(f"Error parsing skills data: {e}")
         skills_data = {}
     
-    # If no skills data but we have quiz results, try to create skills data from most recent quiz
-    # if (not skills_data or not skills_data.get('proficientSkills')) and quiz_results:
-    #     try:
-    #         most_recent = quiz_results[0]  # Assuming quiz_results is ordered by date
-    #         skills_data = {
-    #             "proficientSkills": json.loads(most_recent['proficient_skills']),
-    #             "improvementSkills": json.loads(most_recent['improvement_skills']),
-    #             "category": most_recent['category'],
-    #             "score": most_recent['score']
-    #         }
-    #     except Exception as e:
-    #         print(f"Error creating skills data from quiz results: {e}")
-
-    print(skills_data)
-    if (not skills_data) and quiz_results:
-        skills_data = {}
-    print(skills_data)
-    # print(f"User ID: {user_id}, Skills Data: {skills_data}")
-    
     return render_template('dashboard.html', 
-                          user=skills_data, 
+                          user=user, 
                           skills=skills_data, 
-                          quiz_results=quiz_results)
+                          quiz_results=quiz_results,
+                          interview_history=interview_history)
 
 @app.route('/profile')
 def profile():
-    # Check if user is logged in
     if 'user_id' not in session:
         return redirect('/login')
     
-    # Get user information
     user_id = session['user_id']
     user = get_user_by_id(user_id)
     
@@ -552,10 +508,8 @@ def profile():
         session.clear()
         return redirect('/login')
     
-    # Get user's quiz results
     quiz_results = get_user_quiz_results(user_id)
     
-    # Process skills data
     skills_data = {}
     try:
         if user['skills_data']:
@@ -577,11 +531,9 @@ def update_user_skills():
     user_id = session['user_id']
     
     try:
-        # Validate the data structure
         if not isinstance(data, dict):
             return jsonify({"error": "Invalid data format"}), 400
             
-        # Ensure proficientSkills and improvementSkills are lists if present
         if 'proficientSkills' in data and not isinstance(data['proficientSkills'], list):
             data['proficientSkills'] = []
             
@@ -590,8 +542,6 @@ def update_user_skills():
         
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Update the user's skills_data in the database
         cursor.execute(
             "UPDATE users SET skills_data = ? WHERE id = ?",
             (json.dumps(data), user_id)
@@ -611,11 +561,9 @@ def markdown_filter(text):
 @app.route('/resume_tips')
 def resume_tips_page():
     """Display the resume and interview tips page with job role selection"""
-    # Check if user is logged in
     if 'user_id' not in session:
         return redirect('/login')
     
-    # Get all job roles from the database
     conn = get_db_connection()
     job_roles = conn.execute('SELECT * FROM job_roles ORDER BY role_name').fetchall()
     conn.close()
@@ -630,33 +578,27 @@ def resume_tips_page():
 def get_role_tips(role_id, tips_type):
     
     """Get tips for a specific job role and tips type"""
-    # Check if user is logged in
     if 'user_id' not in session:
         return redirect('/login')
     
-    # Validate tips type
     if tips_type not in ['resume', 'interview']:
         return redirect('/resume_tips')
     
-    # Get the job role details
     conn = get_db_connection()
     current_role = conn.execute('SELECT * FROM job_roles WHERE id = ?', 
                               (role_id,)).fetchone()
     
-    # Get all job roles for the dropdown
     job_roles = conn.execute('SELECT * FROM job_roles ORDER BY role_name').fetchall()
     conn.close()
     
     if not current_role:
         return redirect('/resume_tips')
     
-    # Get tips based on the job role and type
     if tips_type == 'resume':
         tips_md = get_resume_tips(current_role['role_name'])
-    else:  # interview tips
+    else:  
         tips_md = get_interview_tips(current_role['role_name'])
 
-    # Format the tips as HTML with styling
     tips = format_tips_html(tips_md)
     
     return render_template('resume_tips.html',
@@ -664,6 +606,249 @@ def get_role_tips(role_id, tips_type):
                           tips=tips,
                           current_role=current_role,
                           tips_type=tips_type)
+
+
+
+# INTERVIEW RELATED ROUTES
+@app.route('/virtual_interview')
+def virtual_interview():
+    # Get job roles from the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, role_name FROM job_roles")
+    job_roles = cursor.fetchall()
+    conn.close()
+    
+    # Get user skills if logged in
+    skills = {}
+    if 'user_id' in session:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT skills_data FROM users WHERE id = ?", (session['user_id'],))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user and user['skills_data']:
+            skills = json.loads(user['skills_data'])
+    
+    return render_template('virtual_interview.html', job_roles=job_roles, skills=skills)
+
+@app.route('/api/start_interview', methods=['POST'])
+def start_interview():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    data = request.json
+    user_id = session['user_id']
+    skill_area = data.get('skill_area')
+    job_role = data.get('job_role')
+    
+    # Generate initial greeting and first question based on skill area
+    interview_data = generate_initial_interview_questions(skill_area, job_role)
+    
+    # Store interview session in database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO interview_sessions 
+           (user_id, skill_area, job_role, started_at, status) 
+           VALUES (?, ?, ?, ?, ?)""",
+        (user_id, skill_area, job_role, datetime.now().isoformat(), 'in_progress')
+    )
+    interview_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    
+    return jsonify({
+        "interview_id": interview_id,
+        "greeting": interview_data["greeting"],
+        "first_question": interview_data["first_question"]
+    })
+
+@app.route('/api/submit_interview_answer', methods=['POST'])
+def submit_interview_answer():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    data = request.json
+    user_id = session['user_id']
+    interview_id = data.get('interview_id')
+    question = data.get('question')
+    answer = data.get('answer')
+    is_final = data.get('is_final', False)
+    
+    # Save the Q&A pair to database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO interview_qa 
+           (interview_id, question, answer, timestamp) 
+           VALUES (?, ?, ?, ?)""",
+        (interview_id, question, answer, datetime.now().isoformat())
+    )
+    conn.commit()
+    
+    # Get interview context
+    cursor.execute(
+        "SELECT skill_area, job_role FROM interview_sessions WHERE id = ?",
+        (interview_id,)
+    )
+    session_data = cursor.fetchone()
+    conn.close()
+    
+    if is_final:
+        # If this is the final answer, don't generate a new question
+        return jsonify({
+            "success": True
+        })
+    else:
+        # Generate next question based on previous answer
+        next_data = generate_follow_up_question(
+            session_data['skill_area'], 
+            session_data['job_role'],
+            question, 
+            answer
+        )
+        
+        return jsonify({
+            "next_question": next_data["next_question"],
+            "is_final": next_data.get("is_final", False)
+        })
+
+@app.route('/api/complete_interview', methods=['POST'])
+def complete_interview():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    data = request.json
+    interview_id = data.get('interview_id')
+    
+    # Generate analysis and feedback from the interview
+    analysis, feedback = generate_interview_analysis(interview_id)
+    
+    # Update interview status and save analysis
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """UPDATE interview_sessions 
+           SET status = ?, completed_at = ?, analysis = ?, feedback = ?
+           WHERE id = ?""",
+        ('completed', datetime.now().isoformat(), json.dumps(analysis), json.dumps(feedback), interview_id)
+    )
+    conn.commit()
+    conn.close()
+    
+    return jsonify({
+        "success": True,
+        "analysis": analysis,
+        "feedback": feedback
+    })
+
+
+@app.route('/api/save_interview_results', methods=['POST'])
+def save_interview_results():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    data = request.json
+    user_id = session['user_id']
+    interview_id = data.get('interview_id')
+    
+    if not interview_id:
+        return jsonify({"error": "No interview ID provided"}), 400
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get interview session data
+        cursor.execute(
+            """SELECT skill_area, job_role, analysis, feedback, completed_at 
+               FROM interview_sessions 
+               WHERE id = ? AND user_id = ?""",
+            (interview_id, user_id)
+        )
+        
+        interview = cursor.fetchone()
+        if not interview:
+            return jsonify({"error": "Interview not found"}), 404
+        
+        # Parse the analysis and feedback JSON
+        analysis = json.loads(interview['analysis']) if interview['analysis'] else {}
+        feedback = json.loads(interview['feedback']) if interview['feedback'] else {}
+        
+        # Calculate overall score (average of technical and communication)
+        technical_score = analysis.get('technical_score', 0)
+        communication_score = analysis.get('communication_score', 0)
+        overall_score = (technical_score + communication_score) // 2
+        
+        # Insert into user_interview_results
+        cursor.execute(
+            """INSERT INTO user_interview_results
+               (user_id, interview_id, technical_score, communication_score, overall_score,
+                skill_area, job_role, completed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                user_id, interview_id, technical_score, communication_score, overall_score,
+                interview['skill_area'], interview['job_role'], interview['completed_at']
+            )
+        )
+        
+        # Update user skills data with new insights
+        cursor.execute("SELECT skills_data FROM users WHERE id = ?", (user_id,))
+        user_skills_row = cursor.fetchone()
+        
+        if user_skills_row and user_skills_row['skills_data']:
+            try:
+                skills_data = json.loads(user_skills_row['skills_data'])
+                
+                # Add skills that need improvement to the improvement list if not already there
+                improvement_skills = skills_data.get('improvementSkills', [])
+                for skill in feedback.get('areas_for_improvement', []):
+                    skill_keyword = extract_skill_keyword(skill)
+                    if skill_keyword and skill_keyword not in improvement_skills:
+                        improvement_skills.append(skill_keyword)
+                
+                # Update the skills data
+                skills_data['improvementSkills'] = improvement_skills
+                skills_data['lastInterviewScore'] = overall_score
+                skills_data['lastInterviewDate'] = interview['completed_at']
+                
+                # Save back to database
+                cursor.execute(
+                    "UPDATE users SET skills_data = ? WHERE id = ?",
+                    (json.dumps(skills_data), user_id)
+                )
+            except Exception as e:
+                print(f"Error updating user skills data: {e}")
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def extract_skill_keyword(text):
+    """Extract a skill keyword from feedback text"""
+    # This is a simple implementation - in a production system, you'd use NLP or a more sophisticated approach
+    # Common technical skills to look for
+    common_skills = [
+        "javascript", "python", "java", "react", "angular", "vue", "nodejs", "express", 
+        "django", "flask", "spring", "hibernate", "sql", "database", "nosql", "mongodb",
+        "firebase", "aws", "azure", "gcp", "docker", "kubernetes", "ci/cd", "git",
+        "data structures", "algorithms", "system design", "oop", "functional programming",
+        "testing", "debugging", "problem solving", "communication", "teamwork",
+        "time management", "organization", "leadership", "creativity", "critical thinking"
+    ]
+    
+    # Check if any common skill appears in the text
+    text_lower = text.lower()
+    for skill in common_skills:
+        if skill in text_lower:
+            return skill
+    
+    return None
 
 if __name__ == '__main__':
     app.run(debug=True)

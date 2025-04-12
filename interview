@@ -1,0 +1,193 @@
+# interview_utils.py
+import json
+import openai
+import os
+from dotenv import load_dotenv
+import sqlite3
+
+load_dotenv()
+openai.api_key = os.environ.get('OPENAI_API_KEY')
+
+def get_db_connection():
+    conn = sqlite3.connect('job_market.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def generate_initial_interview_questions(skill_area, job_role):
+    """Generate the initial greeting and first question for the interview"""
+    # Fetch relevant skill info from database if possible
+    skill_details = get_skill_details(skill_area, job_role)
+    
+    # Generate interview context with GPT
+    response = openai.ChatCompletion.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": f"""You are an experienced technical interviewer for {job_role} positions.
+             You are conducting a virtual interview focused on {skill_area}. 
+             Create a natural, professional greeting and first interview question. 
+             The greeting should be brief, professional, and welcoming.
+             The first question should be an appropriate technical question for a junior to mid-level {job_role} with skills in {skill_area}.
+             Format your response as JSON with 'greeting' and 'first_question' fields."""},
+            {"role": "user", "content": f"Start a technical interview for a {job_role} position, focusing on {skill_area} skills."}
+        ],
+        temperature=0.7,
+        max_tokens=500
+    )
+    
+    try:
+        result = json.loads(response.choices[0].message.content)
+        return {
+            "greeting": result.get("greeting", f"Hello, I'll be interviewing you for the {job_role} position today, focusing on {skill_area}."),
+            "first_question": result.get("first_question", f"Let's start with a question about {skill_area}. Can you explain your experience with it?")
+        }
+    except Exception as e:
+        print(f"Error parsing AI response: {e}")
+        return {
+            "greeting": f"Hello, I'll be interviewing you for the {job_role} position today, focusing on {skill_area}.",
+            "first_question": f"Let's start with a question about {skill_area}. Can you explain your experience with it?"
+        }
+        
+def generate_follow_up_question(skill_area, job_role, previous_question, previous_answer):
+    """Generate a follow-up question based on the previous answer"""
+    # Track how many questions have been asked in this thread to determine when to end
+    question_count = get_question_count_for_current_interview(previous_question)
+    
+    # Set a flag for ending the interview after a reasonable number of questions
+    is_final = question_count >= 5
+    end_message = ""
+    
+    if is_final:
+        end_prompt = f"This should be the final question of the interview. After this question, please include a brief closing statement thanking the candidate."
+    else:
+        end_prompt = "The interview should continue after this question."
+    
+    response = openai.ChatCompletion.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": f"""You are an experienced technical interviewer for {job_role} positions.
+             You are conducting a virtual interview focused on {skill_area}.
+             Based on the candidate's previous answer, ask a relevant follow-up question.
+             The question should logically follow from their response and probe deeper into their knowledge.
+             {end_prompt}
+             Format your response as JSON with a 'next_question' field and, if applicable, an 'end_message' field."""},
+            {"role": "user", "content": f"Previous question: {previous_question}"},
+            {"role": "assistant", "content": f"Previous answer: {previous_answer}"},
+            {"role": "user", "content": "Generate the next interview question based on this response."}
+        ],
+        temperature=0.7,
+        max_tokens=500
+    )
+    
+    try:
+        result = json.loads(response.choices[0].message.content)
+        return {
+            "next_question": result.get("next_question", "Could you elaborate more on what you just mentioned?"),
+            "end_message": result.get("end_message", ""),
+            "is_final": is_final
+        }
+    except Exception as e:
+        print(f"Error parsing AI response: {e}")
+        return {
+            "next_question": "Could you tell me more about your experience with this technology?",
+            "is_final": is_final
+        }
+
+def generate_interview_analysis(interview_id):
+    """Generate analysis and feedback based on the complete interview"""
+    # Retrieve all Q&A pairs for this interview
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get interview context
+    cursor.execute(
+        "SELECT skill_area, job_role FROM interview_sessions WHERE id = ?", 
+        (interview_id,)
+    )
+    interview_session = cursor.fetchone()
+    
+    # Get all Q&A pairs
+    cursor.execute(
+        "SELECT question, answer FROM interview_qa WHERE interview_id = ? ORDER BY timestamp",
+        (interview_id,)
+    )
+    qa_pairs = cursor.fetchall()
+    conn.close()
+    
+    # Format the interview transcript
+    transcript = "\n\n".join([f"Q: {qa['question']}\nA: {qa['answer']}" for qa in qa_pairs])
+    
+    # Get AI analysis
+    response = openai.ChatCompletion.create(
+        model="gpt-4-turbo",
+        messages=[
+            {"role": "system", "content": f"""You are an expert in technical interviews for {interview_session['job_role']} positions.
+             Analyze the following interview transcript focused on {interview_session['skill_area']} skills.
+             Provide an assessment of the candidate's technical knowledge, communication skills, and problem-solving approach.
+             Also provide specific, actionable feedback on how they can improve.
+             Format your response as JSON with 'strengths', 'areas_for_improvement', 'technical_score' (0-100), 
+             'communication_score' (0-100), 'overall_feedback', and 'next_steps' fields."""},
+            {"role": "user", "content": f"Interview transcript:\n{transcript}"}
+        ],
+        temperature=0.7,
+        max_tokens=1000
+    )
+    
+    try:
+        result = json.loads(response.choices[0].message.content)
+        
+        analysis = {
+            "technical_score": result.get("technical_score", 70),
+            "communication_score": result.get("communication_score", 70),
+            "strengths": result.get("strengths", ["Good understanding of basic concepts"])
+        }
+        
+        feedback = {
+            "areas_for_improvement": result.get("areas_for_improvement", ["Practice more technical explanations"]),
+            "overall_feedback": result.get("overall_feedback", "Your interview showed promising skills but needs further development."),
+            "next_steps": result.get("next_steps", ["Review fundamental concepts", "Practice explaining technical solutions"])
+        }
+        
+        return analysis, feedback
+    except Exception as e:
+        print(f"Error parsing AI response: {e}")
+        return {
+            "technical_score": 70,
+            "communication_score": 70,
+            "strengths": ["Unable to generate detailed analysis"]
+        }, {
+            "areas_for_improvement": ["Practice more interview questions"],
+            "overall_feedback": "We were unable to generate a complete analysis of your interview.",
+            "next_steps": ["Try another practice interview"]
+        }
+
+def get_skill_details(skill_area, job_role):
+    """Get detailed information about a specific skill area from the database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # This is a placeholder - you would need to create a proper query based on your database structure
+    cursor.execute(
+        """SELECT * FROM job_market_data 
+           WHERE required_skills LIKE ? AND job_title LIKE ? 
+           LIMIT 10""",
+        (f"%{skill_area}%", f"%{job_role}%")
+    )
+    
+    skills_data = cursor.fetchall()
+    conn.close()
+    
+    return skills_data
+
+def get_question_count_for_current_interview(question):
+    """Simple helper to track how many questions have been asked based on the complexity of the current question"""
+    # This is a very simple implementation - in a real system, you'd track this in the database
+    # Here we're just using the length/complexity of the question as a crude approximation
+    words = question.split()
+    if len(words) > 20:
+        return 4  # Complex question, probably later in the interview
+    elif len(words) > 15:
+        return 3
+    elif len(words) > 10:
+        return 2
+    else:
+        return 1  # Simple question, probably early in the interview

@@ -1,0 +1,79 @@
+/* Virtual Interview Styling */
+.interviewer-avatar {
+    text-align: center;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.interviewer-avatar img {
+    border: 5px solid #e9ecef;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.interviewer-avatar img:hover {
+    transform: scale(1.05);
+}
+
+#interview-conversation {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.qa-pair {
+    margin-bottom: 20px;
+}
+
+.question {
+    border-left: 4px solid #6c757d;
+    margin-bottom: 10px;
+}
+
+.answer {
+    border-left: 4px solid #28a745;
+    margin-left: 20px;
+}
+
+#recording-status {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Results styling */
+.progress {
+    height: 25px;
+}
+
+.progress-bar {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .interviewer-avatar {
+        margin-bottom: 30px;
+    }
+    
+    .interviewer-avatar img {
+        max-width: 100px;
+    }
+    
+    .answer {
+        margin-left: 10px;
+    }
+}

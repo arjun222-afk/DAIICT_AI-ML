@@ -7,10 +7,9 @@ from openai import OpenAI
 
 load_dotenv()
 
-# Configure the OpenRouter API with your API key
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.environ.get("OPENROUTER_API_KEY", "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")
+    api_key=os.environ.get("OPENROUTER_API_KEY")
 )
 
 def get_resume_tips(job_role):
@@ -130,16 +129,13 @@ def format_tips_html(markdown_text):
     """
     Convert markdown to HTML with some additional styling
     """
-    # First convert markdown to HTML
     html = markdown.markdown(markdown_text)
     
-    # Add some classes for styling
     html = html.replace('<h2>', '<h2 class="mt-4 mb-3">')
     html = html.replace('<h3>', '<h3 class="mt-3 mb-2 text-primary">')
     html = html.replace('<ul>', '<ul class="list-group list-group-flush mb-3">')
     html = html.replace('<li>', '<li class="list-group-item">')
     
-    # Make sure links are clickable and open in a new tab
     html = re.sub(r'<a href="(.*?)"', r'<a href="\1" target="_blank" rel="noopener noreferrer"', html)
     
     return html
