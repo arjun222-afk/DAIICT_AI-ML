@@ -9,7 +9,10 @@ from auth_utils import register_user, login_user, get_user_by_id, get_user_quiz_
 from flask import session, redirect, url_for, flash
 import json
 from dotenv import load_dotenv
+from ai_utils import get_career_path_recommendations, save_user_recommendations
+from network_analysis import generate_network_html, get_user_similarity_network, get_skill_job_network, get_full_network
 import os
+from pathlib import Path
 from ai_utils import get_resume_tips, get_interview_tips, format_tips_html
 import markdown
 # from interview_utils import generate_initial_interview_questions, generate_follow_up_question, generate_interview_analysis
@@ -849,6 +852,356 @@ def extract_skill_keyword(text):
             return skill
     
     return None
+
+
+
+
+# Career Path Recommendation Route
+
+
+@app.route('/career_paths')
+def career_paths_page():
+    """Display the career paths recommendation page"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    user_id = session['user_id']
+    user = get_user_by_id(user_id)
+    
+    if not user:
+        session.clear()
+        return redirect('/login')
+    
+    # Get user's skills data and quiz results
+    skills_data = {}
+    try:
+        if user['skills_data'] and user['skills_data'].strip():
+            skills_data = json.loads(user['skills_data'])
+    except Exception as e:
+        print(f"Error parsing skills data: {e}")
+        skills_data = {}
+    
+    quiz_results = get_user_quiz_results(user_id)
+    
+    # Check if user has taken any skill assessments
+    has_skill_data = bool(skills_data) or bool(quiz_results)
+    
+    # Get existing recommendations if available
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get recommendations with career path details
+    cursor.execute("""
+        SELECT r.*, c.title, c.description, c.required_skills, c.growth_potential, 
+               c.market_demand, c.avg_salary, c.next_steps
+        FROM user_career_recommendations r
+        JOIN career_paths c ON r.career_path_id = c.id
+        WHERE r.user_id = ?
+        ORDER BY r.matching_score DESC
+    """, (user_id,))
+    
+    recommendations = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return render_template('career_paths.html',
+                          user=user,
+                          has_skill_data=has_skill_data,
+                          recommendations=recommendations)
+
+@app.route('/api/generate_career_recommendations', methods=['POST'])
+def generate_career_recommendations():
+    """Generate new career path recommendations for the user"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    user_id = session['user_id']
+    user = get_user_by_id(user_id)
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    # Get user's skills data and quiz results
+    skills_data = {}
+    try:
+        if user['skills_data'] and user['skills_data'].strip():
+            skills_data = json.loads(user['skills_data'])
+    except Exception as e:
+        print(f"Error parsing skills data: {e}")
+        skills_data = {}
+    
+    quiz_results = get_user_quiz_results(user_id)
+    
+    # Check if user has taken any skill assessments
+    if not skills_data and not quiz_results:
+        return jsonify({
+            "error": "Please complete at least one skill assessment before generating career recommendations"
+        }), 400
+    
+    # Generate recommendations using AI
+    recommendations = get_career_path_recommendations(skills_data, quiz_results)
+    
+    if "error" in recommendations:
+        return jsonify({"error": recommendations["error"]}), 500
+    
+    # Save recommendations to database
+    save_success = save_user_recommendations(user_id, recommendations)
+    
+    if not save_success:
+        return jsonify({"error": "Failed to save recommendations"}), 500
+    
+    return jsonify({
+        "success": True,
+        "recommendations": recommendations.get("recommendations", [])
+    })
+
+@app.route('/api/career_path_details/<int:path_id>')
+def career_path_details(path_id):
+    """Get details for a specific career path"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get the career path details
+    cursor.execute("SELECT * FROM career_paths WHERE id = ?", (path_id,))
+    career_path = cursor.fetchone()
+    
+    if not career_path:
+        conn.close()
+        return jsonify({"error": "Career path not found"}), 404
+    
+    # Get the user's matching score for this path
+    user_id = session['user_id']
+    cursor.execute("""
+        SELECT matching_score, recommendation_date
+        FROM user_career_recommendations
+        WHERE user_id = ? AND career_path_id = ?
+    """, (user_id, path_id))
+    
+    recommendation = cursor.fetchone()
+    conn.close()
+    
+    # Format the response
+    result = dict(career_path)
+    if recommendation:
+        result['matching_score'] = recommendation['matching_score']
+        result['recommendation_date'] = recommendation['recommendation_date']
+    
+    return jsonify(result)
+
+@app.route('/network_analysis')
+def network_analysis():
+    """Display the network analysis page with visualizations"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    # Generate the networks if they don't exist
+    user_network_file = "networks/user_similarity_network.html"
+    skill_job_network_file = "networks/skill_job_network.html"
+    full_network_file = "networks/full_network.html"
+    
+    # Check if the network files exist and create them if they don't
+    user_network_path = Path("static") / user_network_file
+    skill_job_network_path = Path("static") / skill_job_network_file
+    full_network_path = Path("static") / full_network_file
+    
+    if not user_network_path.exists():
+        try:
+            G = get_user_similarity_network()
+            user_network_file = generate_network_html(G, "user_similarity_network.html", "User Similarity Network")
+        except Exception as e:
+            print(f"Error generating user similarity network: {e}")
+            user_network_file = "error.html"
+    
+    if not skill_job_network_path.exists():
+        try:
+            G = get_skill_job_network()
+            skill_job_network_file = generate_network_html(G, "skill_job_network.html", "Skills & Jobs Network")
+        except Exception as e:
+            print(f"Error generating skill job network: {e}")
+            skill_job_network_file = "error.html"
+    
+    if not full_network_path.exists():
+        try:
+            G = get_full_network()
+            full_network_file = generate_network_html(G, "full_network.html", "Complete Network View")
+        except Exception as e:
+            print(f"Error generating full network: {e}")
+            full_network_file = "error.html"
+    
+    # Get network statistics
+    conn = get_db_connection()
+    user_count = conn.execute("SELECT COUNT(*) as count FROM users").fetchone()['count']
+    
+    # Count skills from quiz_questions
+    skill_count = conn.execute("""
+        SELECT COUNT(DISTINCT skill) as count FROM quiz_questions
+        WHERE skill IS NOT NULL AND skill != ''
+    """).fetchone()['count']
+    
+    # Count jobs
+    job_count = conn.execute("SELECT COUNT(*) as count FROM job_market_data").fetchone()['count']
+    conn.close()
+    
+    return render_template('network_analysis.html',
+                          user_network_file=user_network_file,
+                          skill_job_network_file=skill_job_network_file,
+                          full_network_file=full_network_file,
+                          user_count=user_count,
+                          skill_count=skill_count,
+                          job_count=job_count)
+
+@app.route('/api/refresh_network')
+def refresh_network():
+    """API endpoint to refresh a specific network visualization"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    network_type = request.args.get('type', '')
+    
+    try:
+        if network_type == 'user-network':
+            G = get_user_similarity_network()
+            file_path = generate_network_html(G, "user_similarity_network.html", "User Similarity Network")
+        elif network_type == 'skill-job-network':
+            G = get_skill_job_network()
+            file_path = generate_network_html(G, "skill_job_network.html", "Skills & Jobs Network")
+        elif network_type == 'full-network':
+            G = get_full_network()
+            file_path = generate_network_html(G, "full_network.html", "Complete Network View")
+        else:
+            return jsonify({"error": "Invalid network type"}), 400
+            
+        return jsonify({"success": True, "file_path": file_path})
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+@app.route('/api/network_stats')
+def network_stats():
+    """API endpoint to get network statistics"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        # Get user skills network and analyze
+        user_network = get_user_similarity_network()
+        
+        # Calculate some basic statistics
+        user_nodes = [node for node in user_network.nodes() if node.startswith('user_')]
+        skill_nodes = [node for node in user_network.nodes() if node.startswith('skill_')]
+        
+        # Find most connected users (users with most skills)
+        user_connections = {}
+        for user in user_nodes:
+            user_connections[user] = len(list(user_network.neighbors(user)))
+        
+        top_users = sorted(user_connections.items(), key=lambda x: x[1], reverse=True)[:5]
+        
+        # Find most common skills (skills connected to most users)
+        skill_connections = {}
+        for skill in skill_nodes:
+            skill_connections[skill] = len(list(user_network.neighbors(skill)))
+        
+        top_skills = sorted(skill_connections.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        # Get job skills network data
+        job_network = get_skill_job_network()
+        job_nodes = [node for node in job_network.nodes() if node.startswith('job_')]
+        
+        return jsonify({
+            "success": True,
+            "user_count": len(user_nodes),
+            "skill_count": len(skill_nodes),
+            "job_count": len(job_nodes),
+            "top_users": [{"id": user.replace("user_", ""), "connections": conns} for user, conns in top_users],
+            "top_skills": [{"name": skill.replace("skill_", ""), "connections": conns} for skill, conns in top_skills]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+# Add a utility function to find skill recommendations based on network analysis
+@app.route('/api/skill_recommendations')
+def skill_recommendations():
+    """Get skill recommendations for the current user based on network analysis"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    user_id = session['user_id']
+    user_node = f"user_{user_id}"
+    
+    try:
+        # Get user similarity network
+        G = get_user_similarity_network()
+        
+        # Check if user exists in the network
+        if user_node not in G.nodes():
+            return jsonify({
+                "error": "User not found in network. Please complete a skill assessment first.",
+                "success": False
+            }), 404
+        
+        # Get user's current skills
+        user_skills = set()
+        for neighbor in G.neighbors(user_node):
+            if neighbor.startswith('skill_'):
+                user_skills.add(neighbor.replace('skill_', ''))
+        
+        # Find similar users (users connected to the current user)
+        similar_users = []
+        for neighbor in G.neighbors(user_node):
+            if neighbor.startswith('user_'):
+                similar_users.append(neighbor)
+        
+        # Get skills from similar users that the current user doesn't have
+        recommended_skills = {}
+        for similar_user in similar_users:
+            for skill_node in G.neighbors(similar_user):
+                if skill_node.startswith('skill_'):
+                    skill_name = skill_node.replace('skill_', '')
+                    if skill_name not in user_skills:
+                        if skill_name in recommended_skills:
+                            recommended_skills[skill_name] += 1
+                        else:
+                            recommended_skills[skill_name] = 1
+        
+        # Sort recommendations by frequency
+        sorted_recommendations = sorted(recommended_skills.items(), key=lambda x: x[1], reverse=True)
+        
+        # Get job market demand for these skills
+        skill_job_network = get_skill_job_network()
+        skill_demand = {}
+        
+        for skill, _ in sorted_recommendations:
+            skill_node = f"skill_{skill}"
+            if skill_node in skill_job_network.nodes():
+                connected_jobs = list(skill_job_network.neighbors(skill_node))
+                skill_demand[skill] = len(connected_jobs)
+        
+        # Format the final recommendations
+        final_recommendations = []
+        for skill, frequency in sorted_recommendations[:10]:  # Top 10 recommendations
+            final_recommendations.append({
+                "skill": skill,
+                "peer_frequency": frequency,
+                "job_demand": skill_demand.get(skill, 0)
+            })
+        
+        return jsonify({
+            "success": True,
+            "current_skills": list(user_skills),
+            "recommendations": final_recommendations
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)

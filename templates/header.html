@@ -80,6 +80,14 @@
                     <li class="nav-item">
                         <a class="nav-link text-col" href="/virtual_interview">Virtual Interview</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-col" href="/career_paths">Career Paths</a>
+                      </li>
+                      <li class="nav-item">
+                        <a class="nav-link text-col {% if request.path == '/network_analysis' %}active{% endif %}" href="{{ url_for('network_analysis') }}">
+                          <i class="bi bi-diagram-3"></i> Network Analysis
+                        </a>
+                      </li>
                 {% else %}
                     <li class="nav-item">
                         <a class="nav-link text-col" href="/">Home</a>
