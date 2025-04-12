@@ -365,18 +365,30 @@ def submit_quiz_results():
     session_user_id = session.get('user_id')
     data_user_id = data.get('user_id')
 
-    # Extract user_id if the user is logged in (you'll need to implement session management)
-    # user_id = data.get('user_id')
-    # print(12)
-    # print(user_id)
+    # Use session user_id if available and different from data
     if session_user_id and (not data_user_id or data_user_id != session_user_id):
         user_id = session_user_id
         print(f"Using session user_id: {user_id} instead of data user_id: {data_user_id}")
     else:
         user_id = data_user_id
+    
+    # Validate user_id
+    if not user_id:
+        return jsonify({"error": "No user ID provided"}), 400
+        
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Ensure proficient_skills and improvement_skills are JSON strings
+        proficient_skills = data.get('proficientSkills', [])
+        improvement_skills = data.get('improvementSkills', [])
+        
+        if isinstance(proficient_skills, list):
+            proficient_skills = json.dumps(proficient_skills)
+        
+        if isinstance(improvement_skills, list):
+            improvement_skills = json.dumps(improvement_skills)
         
         # Insert quiz results into database
         cursor.execute("""
@@ -386,8 +398,8 @@ def submit_quiz_results():
         """, (
             user_id,
             data.get('category'),
-            json.dumps(data.get('proficientSkills', [])),
-            json.dumps(data.get('improvementSkills', [])),
+            proficient_skills,
+            improvement_skills,
             data.get('score'),
             data.get('completedAt')
         ))
@@ -459,8 +471,6 @@ def login():
         session['user_id'] = user_id
         session['user_email'] = email
         
-        print("Session after login:", session)  # Debugging
-        
         # Redirect to dashboard
         return redirect('/dashboard')
     
@@ -492,7 +502,7 @@ def dashboard():
     
     # Get user's quiz results
     quiz_results = get_user_quiz_results(user_id)
-    
+    # print(quiz_results)
     # Process skills data
     skills_data = {}
     try:
@@ -502,24 +512,27 @@ def dashboard():
         print(f"Error parsing skills data: {e}")
         skills_data = {}
     
-    # If the user has taken quizzes but we don't have skills data,
-    # try to extract it from their most recent quiz result
-    if not skills_data and quiz_results:
-        try:
-            most_recent = quiz_results[0]  # Assuming quiz_results is ordered by date
-            skills_data = {
-                "proficientSkills": json.loads(most_recent['proficient_skills']),
-                "improvementSkills": json.loads(most_recent['improvement_skills']),
-                "category": most_recent['category'],
-                "score": most_recent['score']
-            }
-        except Exception as e:
-            print(f"Error creating skills data from quiz results: {e}")
-    
-    print(f"User ID: {user_id}, Skills Data: {skills_data}")
+    # If no skills data but we have quiz results, try to create skills data from most recent quiz
+    # if (not skills_data or not skills_data.get('proficientSkills')) and quiz_results:
+    #     try:
+    #         most_recent = quiz_results[0]  # Assuming quiz_results is ordered by date
+    #         skills_data = {
+    #             "proficientSkills": json.loads(most_recent['proficient_skills']),
+    #             "improvementSkills": json.loads(most_recent['improvement_skills']),
+    #             "category": most_recent['category'],
+    #             "score": most_recent['score']
+    #         }
+    #     except Exception as e:
+    #         print(f"Error creating skills data from quiz results: {e}")
+
+    print(skills_data)
+    if (not skills_data) and quiz_results:
+        skills_data = {}
+    print(skills_data)
+    # print(f"User ID: {user_id}, Skills Data: {skills_data}")
     
     return render_template('dashboard.html', 
-                          user=user, 
+                          user=skills_data, 
                           skills=skills_data, 
                           quiz_results=quiz_results)
 
@@ -562,6 +575,17 @@ def update_user_skills():
     user_id = session['user_id']
     
     try:
+        # Validate the data structure
+        if not isinstance(data, dict):
+            return jsonify({"error": "Invalid data format"}), 400
+            
+        # Ensure proficientSkills and improvementSkills are lists if present
+        if 'proficientSkills' in data and not isinstance(data['proficientSkills'], list):
+            data['proficientSkills'] = []
+            
+        if 'improvementSkills' in data and not isinstance(data['improvementSkills'], list):
+            data['improvementSkills'] = []
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         

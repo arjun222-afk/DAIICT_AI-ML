@@ -296,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add this function after mapSkills() in the existing skill_assessment.js file
 
 // Submit quiz results to the server
+// Replace the current submitQuizResults function with:
 function submitQuizResults(results) {
     // Add user ID if available from session
     const userId = getUserIdFromSession();
@@ -303,30 +304,39 @@ function submitQuizResults(results) {
     
     if (userId) {
         results.user_id = userId;
-    } else {
-        console.log("No user ID available, results won't be associated with a user");
-    }
-    
-    // Submit to server
-    fetch('/api/submit_quiz_results', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(results)
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('Success:', data);
         
-        // Also update user skills if logged in
-        if (userId) {
-            updateUserSkills(results);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
+        // Submit to server
+        fetch('/api/submit_quiz_results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(results)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Success:', data);
+            
+            // Also update user skills if logged in
+            if (data.success) {
+                updateUserSkills(results);
+            }
+            
+            // Redirect to dashboard if logged in
+            if (userId) {
+                // Wait 2 seconds to let user see results before redirecting
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 2000);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    } else {
+        // Just store locally if not logged in
+        console.log("No user ID available, results stored locally only");
+    }
 }
 
 // function submitQuizResults(results) {

@@ -17,7 +17,7 @@
                     <h4 class="mb-0">Your Skills Profile</h4>
                 </div>
                 <div class="card-body">
-                    {% if skills and skills.proficientSkills and skills.proficientSkills|length > 0 %}
+                    {% if skills and skills.proficientSkills|length > 0 %}
                         <h5>Proficient Skills</h5>
                         <ul class="mb-4">
                             {% for skill in skills.proficientSkills %}
@@ -26,17 +26,21 @@
                         </ul>
                         
                         <h5>Skills to Improve</h5>
-                        <ul>
-                            {% for skill in skills.improvementSkills %}
-                                <li>{{ skill|replace('_', ' ')|title }}</li>
-                            {% endfor %}
-                        </ul>
+                        {% if skills.improvementSkills is defined and skills.improvementSkills|length > 0 %}
+                            <ul>
+                                {% for skill in skills.improvementSkills %}
+                                    <li>{{ skill|replace('_', ' ')|title }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>Great job! You're proficient in all assessed skills.</p>
+                        {% endif %}
                     {% else %}
                         <p>You haven't completed a skills assessment yet. Take our assessment to discover your strengths and areas for improvement!</p>
                         <a href="/skill_assessment" class="btn btn-primary">Take Skills Assessment</a>
                     {% endif %}
                 </div>
-                {% if skills and skills.proficientSkills %}
+                {% if skills and skills.proficientSkills is defined and skills.proficientSkills|length > 0 %}
                     <div class="card-footer">
                         <a href="/skill_assessment" class="btn btn-outline-primary">Retake Assessment</a>
                     </div>
@@ -51,7 +55,7 @@
                     <h4 class="mb-0">Job Recommendations</h4>
                 </div>
                 <div class="card-body">
-                    {% if skills and skills.proficientSkills and skills.proficientSkills|length > 0 %}
+                    {% if skills and skills.proficientSkills|length > 0 %}
                         <div id="job-recommendations">
                             <p>Based on your skills, here are some recommended job roles:</p>
                             <div class="list-group">
@@ -59,7 +63,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Front-End Developer</h5>
-                                            <small>98% match</small>
+                                            <!-- <small>98% match</small> -->
                                         </div>
                                         <p class="mb-1">Create user interfaces and interactive web applications.</p>
                                     </a>
@@ -69,7 +73,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Back-End Developer</h5>
-                                            <small>95% match</small>
+                                            <!-- <small>95% match</small> -->
                                         </div>
                                         <p class="mb-1">Create server-side logic and APIs.</p>
                                     </a>
@@ -79,7 +83,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Database Developer</h5>
-                                            <small>92% match</small>
+                                            <!-- <small>92% match</small> -->
                                         </div>
                                         <p class="mb-1">Design and optimize database systems.</p>
                                     </a>
@@ -93,6 +97,10 @@
                                         </div>
                                         <p class="mb-1">Lead technical projects and coordinate team efforts.</p>
                                     </a>
+                                {% endif %}
+                                
+                                {% if skills.proficientSkills|length > 0 and not ('front_end' in skills.proficientSkills or 'back_end' in skills.proficientSkills or 'database' in skills.proficientSkills or 'project_management' in skills.proficientSkills) %}
+                                    <p>Take more skill assessments to receive more personalized job recommendations.</p>
                                 {% endif %}
                             </div>
                         </div>
@@ -116,7 +124,7 @@
                     <h4 class="mb-0">Assessment History</h4>
                 </div>
                 <div class="card-body">
-                    {% if quiz_results %}
+                    {% if quiz_results and quiz_results|length > 0 %}
                         <div class="table-responsive">
                             <table class="table table-striped">
                                 <thead>
@@ -136,15 +144,23 @@
                                             <td>{{ result.score }}%</td>
                                             <td>
                                                 {% set proficient = result.proficient_skills|fromjson %}
-                                                {% for skill in proficient %}
-                                                    <span class="badge bg-success me-1">{{ skill|replace('_', ' ')|title }}</span>
-                                                {% endfor %}
+                                                {% if proficient and proficient|length > 0 %}
+                                                    {% for skill in proficient %}
+                                                        <span class="badge bg-success me-1">{{ skill|replace('_', ' ')|title }}</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">None</span>
+                                                {% endif %}
                                             </td>
                                             <td>
                                                 {% set improvement = result.improvement_skills|fromjson %}
-                                                {% for skill in improvement %}
-                                                    <span class="badge bg-warning me-1">{{ skill|replace('_', ' ')|title }}</span>
-                                                {% endfor %}
+                                                {% if improvement and improvement|length > 0 %}
+                                                    {% for skill in improvement %}
+                                                        <span class="badge bg-warning me-1">{{ skill|replace('_', ' ')|title }}</span>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">None</span>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                     {% endfor %}

@@ -26,7 +26,7 @@ def register_user(name, email, password, skills_data='{}'):
         # Insert new user
         cursor.execute(
             "INSERT INTO users (name, email, password_hash, skills_data) VALUES (?, ?, ?, ?)",
-            (name, email, password_hash, skills_data)
+            (name, email, password_hash, "")
         )
         
         user_id = cursor.lastrowid
@@ -59,7 +59,6 @@ def get_user_by_id(user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         cursor.execute("SELECT id, name, email, created_at, skills_data FROM users WHERE id = ?", (user_id,))
         user = cursor.fetchone()
         conn.close()
@@ -78,16 +77,14 @@ def get_user_quiz_results(user_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            SELECT * FROM user_quiz_results 
-            WHERE user_id = ? 
-            ORDER BY completed_at DESC
-        """, (user_id,))
+        cursor.execute("SELECT * FROM user_quiz_results WHERE user_id = ? ORDER BY completed_at DESC", (user_id,))
         
-        results = cursor.fetchall()
+        results = cursor.fetchall()  # ✅ Fetch all matching rows
+        
         conn.close()
         
         # Convert to list of dictionaries
-        return [dict(result) for result in results]
-    except:
+        return [dict(row) for row in results]
+    except Exception as e:
+        print(f"Error fetching quiz results: {e}")
         return []
