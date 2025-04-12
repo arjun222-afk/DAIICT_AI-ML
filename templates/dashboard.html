@@ -10,7 +10,6 @@
     </div>
     
     <div class="row">
-        <!-- Skill Summary Card -->
         <div class="col-md-6 mb-4">
             <div class="card h-100">
                 <div class="card-header bg-primary text-white">
@@ -48,7 +47,6 @@
             </div>
         </div>
         
-        <!-- Job Recommendations Card -->
         <div class="col-md-6 mb-4">
             <div class="card h-100">
                 <div class="card-header bg-success text-white">
@@ -63,7 +61,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Front-End Developer</h5>
-                                            <!-- <small>98% match</small> -->
+                    
                                         </div>
                                         <p class="mb-1">Create user interfaces and interactive web applications.</p>
                                     </a>
@@ -73,7 +71,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Back-End Developer</h5>
-                                            <!-- <small>95% match</small> -->
+                                            
                                         </div>
                                         <p class="mb-1">Create server-side logic and APIs.</p>
                                     </a>
@@ -83,7 +81,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Database Developer</h5>
-                                            <!-- <small>92% match</small> -->
+                                        
                                         </div>
                                         <p class="mb-1">Design and optimize database systems.</p>
                                     </a>
@@ -93,7 +91,7 @@
                                     <a href="#" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h5 class="mb-1">Project Manager</h5>
-                                            <small>90% match</small>
+                                            
                                         </div>
                                         <p class="mb-1">Lead technical projects and coordinate team efforts.</p>
                                     </a>
@@ -117,7 +115,6 @@
     </div>
     
     <div class="row">
-        <!-- Previous Assessments Card -->
         <div class="col-12 mb-4">
             <div class="card">
                 <div class="card-header bg-info text-white">
@@ -180,7 +177,6 @@
 
 {% block scripts %}
 <script>
-    // Add custom filter to parse JSON in Jinja templates
     function fromjson(value) {
         try {
             return JSON.parse(value);
@@ -189,7 +185,6 @@
         }
     }
 
-    // Register the filter
     if (typeof Jinja2 !== 'undefined') {
         Jinja2.filters.fromjson = fromjson;
     }

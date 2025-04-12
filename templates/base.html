@@ -50,11 +50,13 @@
         .signup-prompt {
             background-color: #f0f8ff;
         }
+        .text-col{
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
-    <!-- Add this to header.html for the navbar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container">
         <a class="navbar-brand" href="/">NextStepAI</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -64,17 +66,20 @@
             <ul class="navbar-nav">
                 {% if session.user_id %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/dashboard">Dashboard</a>
+                        <a class="nav-link text-col" href="/dashboard">Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/job_market_analysis">Job Market Analysis</a>
+                        <a class="nav-link text-col" href="/job_market_analysis">Job Market Analysis</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/skill_assessment">Skill Assessment</a>
+                        <a class="nav-link text-col" href="/skill_assessment">Skill Assessment</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/resume_tips">Resume & Interview Tips</a>
                     </li>
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
+                        <a class="nav-link text-col" href="/">Home</a>
                     </li>
                 {% endif %}
                 
@@ -82,17 +87,17 @@
             <ul class="navbar-nav ms-auto">
                 {% if session.user_id %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/profile">Profile</a>
+                        <a class="nav-link text-col" href="/profile">Profile</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/logout">Logout</a>
+                        <a class="nav-link text-col" href="/logout">Logout</a>
                     </li>
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="/login">Login</a>
+                        <a class="nav-link text-col" href="/login">Login</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/signup">Sign Up</a>
+                        <a class="nav-link text-col" href="/signup">Sign Up</a>
                     </li>
                 {% endif %}
             </ul>
@@ -100,14 +105,14 @@
     </div>
 </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4" >
         {% block content %}
-        <div class="row">
-            <div class="col-md-8 offset-md-2 text-center">
+        <div class="row align-items-center justify-content-center" style="margin-top: 100px;">
+            <div class="col-md-8 text-center">
                 <h1 class="mb-4">Welcome to NextStepAI</h1>
                 <p class="lead mb-5">Your intelligent career advisor powered by AI. Analyze job markets, assess your skills, and find your perfect career path.</p>
                 
-                <div class="row mb-5">
+                <div class="row mb-5 justify-content-center">
                     <!-- <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body">

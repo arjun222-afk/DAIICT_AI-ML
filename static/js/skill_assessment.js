@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // DOM elements
     const startView = document.getElementById('start-view');
     const categoryView = document.getElementById('category-view');
     const quizView = document.getElementById('quiz-view');
@@ -12,14 +11,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const quizProgress = document.getElementById('quiz-progress');
     const signupButton = document.getElementById('signup-btn');
     
-    // Quiz state
     let currentCategory = '';
     let questions = [];
     let currentQuestionIndex = 0;
     let userAnswers = [];
     let startTime;
     
-    // Event listeners
     startButton.addEventListener('click', () => {
         startView.style.display = 'none';
         categoryView.style.display = 'block';
@@ -36,10 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = '/signup';
     });
     
-    // Fetch questions based on selected category
     function fetchQuestions(category) {
-        // In a real app, this would be an API call
-        // For now, we'll use mock data based on the category
         fetch(`/api/quiz?category=${category}`)
             .then(response => response.json())
             .then(data => {
@@ -51,12 +45,10 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error fetching questions:', error);
-                // Fallback to mock data if API fails
                 useMockData(category);
             });
     }
     
-    // Fallback to mock data if API call fails
     function useMockData(category) {
         let mockQuestions;
         
@@ -145,27 +137,22 @@ document.addEventListener('DOMContentLoaded', function() {
         startQuiz();
     }
     
-    // Start the quiz
     function startQuiz() {
         categoryView.style.display = 'none';
         quizView.style.display = 'block';
         displayQuestion();
     }
     
-    // Display current question
     function displayQuestion() {
         const question = questions[currentQuestionIndex];
         questionText.textContent = question.question;
         
-        // Update progress
         const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
         quizProgress.style.width = `${progress}%`;
         questionCounter.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
         
-        // Clear previous options
         optionsContainer.innerHTML = '';
         
-        // Add options
         question.options.forEach((option, index) => {
             const button = document.createElement('button');
             button.className = 'btn btn-outline-primary mb-2 text-start';
@@ -175,7 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle user answer
     function handleAnswer(selectedOption) {
         const question = questions[currentQuestionIndex];
         
@@ -197,7 +183,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Finish the quiz and show results
     function finishQuiz() {
         const endTime = new Date();
         const timeTaken = Math.round((endTime - startTime) / 1000); // in seconds
@@ -205,11 +190,9 @@ document.addEventListener('DOMContentLoaded', function() {
         quizView.style.display = 'none';
         resultsView.style.display = 'block';
         
-        // Calculate results
         const correctAnswers = userAnswers.filter(answer => answer.isCorrect).length;
         const score = Math.round((correctAnswers / questions.length) * 100);
         
-        // Display overall results
         const resultsContainer = document.getElementById('results-container');
         resultsContainer.innerHTML = `
             <div class="mb-3">
@@ -219,10 +202,8 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Perform skill mapping
         const skillMapping = mapSkills(userAnswers, currentCategory);
         
-        // Display proficient skills
         const proficientSkillsList = document.getElementById('proficient-skills');
         proficientSkillsList.innerHTML = '';
         
@@ -232,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
             proficientSkillsList.appendChild(li);
         });
         
-        // Display skills to improve
         const improvementSkillsList = document.getElementById('improvement-skills');
         improvementSkillsList.innerHTML = '';
         
@@ -242,7 +222,6 @@ document.addEventListener('DOMContentLoaded', function() {
             improvementSkillsList.appendChild(li);
         });
         
-        // Store results in localStorage
         localStorage.setItem('userSkills', JSON.stringify({
             category: currentCategory,
             proficientSkills: skillMapping.proficient,
@@ -252,9 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }));
     }
     
-    // Map user answers to specific skills
     function mapSkills(answers, category) {
-        // Group answers by skill
         const skillResults = {};
         
         answers.forEach(answer => {
@@ -271,7 +248,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Determine proficiency (>= 70% correct = proficient)
         const proficient = [];
         const needsImprovement = [];
         
@@ -293,19 +269,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // Add this function after mapSkills() in the existing skill_assessment.js file
 
-// Submit quiz results to the server
-// Replace the current submitQuizResults function with:
 function submitQuizResults(results) {
-    // Add user ID if available from session
     const userId = getUserIdFromSession();
     console.log("Submitting quiz results with user ID:", userId);
     
     if (userId) {
         results.user_id = userId;
         
-        // Submit to server
         fetch('/api/submit_quiz_results', {
             method: 'POST',
             headers: {
@@ -317,14 +288,11 @@ function submitQuizResults(results) {
         .then(data => {
             console.log('Success:', data);
             
-            // Also update user skills if logged in
             if (data.success) {
                 updateUserSkills(results);
             }
             
-            // Redirect to dashboard if logged in
             if (userId) {
-                // Wait 2 seconds to let user see results before redirecting
                 setTimeout(() => {
                     window.location.href = '/dashboard';
                 }, 2000);
@@ -334,7 +302,6 @@ function submitQuizResults(results) {
             console.error('Error:', error);
         });
     } else {
-        // Just store locally if not logged in
         console.log("No user ID available, results stored locally only");
     }
 }
@@ -372,7 +339,6 @@ function submitQuizResults(results) {
 //     }
 // }
 
-// Function to update user skills in profile
 function updateUserSkills(skillData) {
     fetch('/api/update_user_skills', {
         method: 'POST',
@@ -390,7 +356,6 @@ function updateUserSkills(skillData) {
     });
 }
 
-// Helper function to get user ID from session
 function getUserIdFromSession() {
     const userIdElement = document.getElementById('user-id');
     if (userIdElement && userIdElement.value) {
@@ -404,8 +369,6 @@ function getUserIdFromSession() {
     return null;
 }
 
-// Modify the finishQuiz function to call submitQuizResults
-// Find this in the existing code and update it:
 
 function finishQuiz() {
     const endTime = new Date();
@@ -414,11 +377,9 @@ function finishQuiz() {
     quizView.style.display = 'none';
     resultsView.style.display = 'block';
     
-    // Calculate results
     const correctAnswers = userAnswers.filter(answer => answer.isCorrect).length;
     const score = Math.round((correctAnswers / questions.length) * 100);
     
-    // Display overall results
     const resultsContainer = document.getElementById('results-container');
     resultsContainer.innerHTML = `
         <div class="mb-3">
@@ -428,10 +389,8 @@ function finishQuiz() {
         </div>
     `;
     
-    // Perform skill mapping
     const skillMapping = mapSkills(userAnswers, currentCategory);
     
-    // Display proficient skills
     const proficientSkillsList = document.getElementById('proficient-skills');
     proficientSkillsList.innerHTML = '';
     
@@ -441,7 +400,6 @@ function finishQuiz() {
         proficientSkillsList.appendChild(li);
     });
     
-    // Display skills to improve
     const improvementSkillsList = document.getElementById('improvement-skills');
     improvementSkillsList.innerHTML = '';
     
@@ -451,7 +409,6 @@ function finishQuiz() {
         improvementSkillsList.appendChild(li);
     });
     
-    // Create results object
     const quizResults = {
         category: currentCategory,
         proficientSkills: skillMapping.proficient,
@@ -460,14 +417,11 @@ function finishQuiz() {
         completedAt: new Date().toISOString()
     };
     
-    // Store results in localStorage
     localStorage.setItem('userSkills', JSON.stringify(quizResults));
     
-    // Submit results to server
     submitQuizResults(quizResults);
 }
     
-    // Format skill name for display
     function formatSkillName(skill) {
         const skillNames = {
             // Technical skills
@@ -487,7 +441,6 @@ function finishQuiz() {
         return skillNames[skill] || skill.replace('_', ' ');
     }
     
-    // Format time in minutes and seconds
     function formatTime(seconds) {
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;

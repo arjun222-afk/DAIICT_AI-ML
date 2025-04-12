@@ -158,7 +158,6 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <!-- Results will be loaded dynamically -->
                                 <tr>
                                     <td colspan="6" class="text-center">Use the search form to find jobs</td>
                                 </tr>
@@ -175,7 +174,6 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Fetch market summary
     fetch('/api/market_summary')
         .then(response => response.json())
         .then(data => {
@@ -184,8 +182,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('uniqueLocations').textContent = data.unique_locations;
             document.getElementById('avgRating').textContent = data.average_company_rating;
         });
-
-    // Fetch job count by location
     fetch('/api/job_count_by_location')
         .then(response => response.json())
         .then(data => {
@@ -216,8 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-
-    // Fetch top skills
     fetch('/api/top_skills')
         .then(response => response.json())
         .then(data => {
@@ -249,7 +243,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-    // Fetch salary distribution
     fetch('/api/salary_distribution')
         .then(response => response.json())
         .then(data => {
@@ -290,7 +283,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-    // Fetch experience required
     fetch('/api/experience_required')
         .then(response => response.json())
         .then(data => {
@@ -327,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-    // Fetch job posting trends
     fetch('/api/job_posting_trends')
         .then(response => response.json())
         .then(data => {
@@ -359,7 +350,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-    // Fetch company ratings
     fetch('/api/company_ratings')
         .then(response => response.json())
         .then(data => {
@@ -418,7 +408,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-    // Handle job search form submission
     document.getElementById('jobSearchForm').addEventListener('submit', function(e) {
         e.preventDefault();
         

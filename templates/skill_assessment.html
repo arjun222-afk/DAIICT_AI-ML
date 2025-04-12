@@ -7,7 +7,7 @@
     <input type="hidden" id="user-id" value="{{ session.user_id }}">
     {% endif %}
     
-    <div class="row">
+    <div class="row" style="margin-top: 180px;">
         <div class="col-md-8 offset-md-2 text-center" id="quiz-container">
             <!-- Initial view with start button -->
             <div id="start-view">
@@ -19,7 +19,6 @@
                 <button id="start-quiz-btn" class="btn btn-primary btn-lg">Start the Quiz</button>
             </div>
             
-            <!-- Category selection view (initially hidden) -->
             <div id="category-view" style="display: none;">
                 <h3 class="mb-4">Select a Skill Category</h3>
                 <div class="row">
@@ -41,8 +40,6 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Quiz view (initially hidden) -->
             <div id="quiz-view" style="display: none;">
                 <div class="progress mb-4">
                     <div id="quiz-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
@@ -58,7 +55,6 @@
                 </div>
             </div>
             
-            <!-- Results view (initially hidden) -->
             <div id="results-view" style="display: none;">
                 <h3 class="mb-4">Your Skill Assessment Results</h3>
                 <div class="card mb-4">

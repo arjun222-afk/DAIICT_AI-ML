@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container">
-    <div class="row">
+    <div class="row" style="margin-top: 100px;">
         <div class="col-md-6 offset-md-3">
             <div class="card">
                 <div class="card-header bg-primary text-white">
@@ -31,16 +31,14 @@
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
                         
-                        <!-- Hidden field for user skills -->
                         <input type="hidden" id="user_skills" name="user_skills" value="">
                         <input type="hidden" id="stored-skills" name="user_skills" value="{}">
                         
                         <div id="skills-summary" class="mb-3 p-3 bg-light rounded">
-                            <!-- Skills will be displayed here -->
-                            <p class="mb-2">Based on your assessment, you are proficient in:</p>
+                            <!-- <p class="mb-2">Based on your assessment, you are proficient in:</p> -->
                             <ul id="proficient-display" class="mb-3"></ul>
                             
-                            <p class="mb-2">Areas you could improve:</p>
+                            <!-- <p class="mb-2">Areas you could improve:</p> -->
                             <ul id="improvement-display"></ul>
                         </div>
                         
@@ -58,17 +56,13 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Retrieve user skills from localStorage
         const userSkills = JSON.parse(localStorage.getItem('userSkills') || '{}');
         
-        // Set hidden input value
         document.getElementById('user_skills').value = JSON.stringify(userSkills);
         
-        // Display skills in the summary
-        const proficientList = document.getElementById('proficient-display');
-        const improvementList = document.getElementById('improvement-display');
+        // const proficientList = document.getElementById('proficient-display');
+        // const improvementList = document.getElementById('improvement-display');
         
-        // Helper function to format skill names
         function formatSkillName(skill) {
             const skillNames = {
                 // Technical skills
@@ -88,7 +82,6 @@
             return skillNames[skill] || skill.replace('_', ' ');
         }
         
-        // Display proficient skills
         if (userSkills.proficientSkills && userSkills.proficientSkills.length > 0) {
             userSkills.proficientSkills.forEach(skill => {
                 const li = document.createElement('li');
@@ -99,7 +92,6 @@
             proficientList.innerHTML = '<li>No skills data available</li>';
         }
         
-        // Display skills to improve
         if (userSkills.improvementSkills && userSkills.improvementSkills.length > 0) {
             userSkills.improvementSkills.forEach(skill => {
                 const li = document.createElement('li');
@@ -112,7 +104,6 @@
     });
 </script>
 <script>
-    // On page load, check for stored skills and add to form
     document.addEventListener('DOMContentLoaded', function() {
         const storedSkills = localStorage.getItem('userSkills');
         if (storedSkills) {
