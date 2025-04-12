@@ -66,17 +66,18 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/dashboard">Dashboard</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/job_market_analysis">Job Market Analysis</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/skill_assessment">Skill Assessment</a>
+                    </li>
                 {% else %}
                     <li class="nav-item">
                         <a class="nav-link" href="/">Home</a>
                     </li>
                 {% endif %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/job_market_analysis">Job Market Analysis</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/skill_assessment">Skill Assessment</a>
-                </li>
+                
             </ul>
             <ul class="navbar-nav ms-auto">
                 {% if session.user_id %}
@@ -107,7 +108,7 @@
                 <p class="lead mb-5">Your intelligent career advisor powered by AI. Analyze job markets, assess your skills, and find your perfect career path.</p>
                 
                 <div class="row mb-5">
-                    <div class="col-md-6 mb-3">
+                    <!-- <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h5 class="card-title"><i class="bi bi-graph-up"></i> Job Market Analysis</h5>
@@ -115,7 +116,7 @@
                                 <a href="/job_market_analysis" class="btn btn-primary">Analyze Market</a>
                             </div>
                         </div>
-                    </div>
+                    </div> -->
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body">

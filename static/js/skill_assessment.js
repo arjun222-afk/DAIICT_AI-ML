@@ -303,6 +303,8 @@ function submitQuizResults(results) {
     
     if (userId) {
         results.user_id = userId;
+    } else {
+        console.log("No user ID available, results won't be associated with a user");
     }
     
     // Submit to server
@@ -382,10 +384,13 @@ function updateUserSkills(skillData) {
 function getUserIdFromSession() {
     const userIdElement = document.getElementById('user-id');
     if (userIdElement && userIdElement.value) {
-        console.log("Found user ID:", userIdElement.value); // Debugging
-        return parseInt(userIdElement.value);
+        const userId = parseInt(userIdElement.value, 10);
+        console.log("Found user ID:", userId);
+        if (!isNaN(userId)) {
+            return userId;
+        }
     }
-    console.log("No user ID found"); // Debugging
+    console.log("No valid user ID found in session");
     return null;
 }
 

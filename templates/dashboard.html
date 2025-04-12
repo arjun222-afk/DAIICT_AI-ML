@@ -1,6 +1,5 @@
 {% extends 'header.html' %}
 
-
 {% block content %}
 <div class="container">
     <div class="row mb-4">
@@ -17,27 +16,26 @@
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">Your Skills Profile</h4>
                 </div>
-                <!-- Update the skill summary card in dashboard.html -->
-<div class="card-body">
-    {% if skills and skills.proficientSkills and skills.proficientSkills|length > 0 %}
-        <h5>Proficient Skills</h5>
-        <ul class="mb-4">
-            {% for skill in skills.proficientSkills %}
-                <li>{{ skill|replace('_', ' ')|title }}</li>
-            {% endfor %}
-        </ul>
-        
-        <h5>Skills to Improve</h5>
-        <ul>
-            {% for skill in skills.improvementSkills %}
-                <li>{{ skill|replace('_', ' ')|title }}</li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>No skill assessment data available. Take our skills assessment to get started!</p>
-        <a href="/skill_assessment" class="btn btn-primary">Take Skills Assessment</a>
-    {% endif %}
-</div>
+                <div class="card-body">
+                    {% if skills and skills.proficientSkills and skills.proficientSkills|length > 0 %}
+                        <h5>Proficient Skills</h5>
+                        <ul class="mb-4">
+                            {% for skill in skills.proficientSkills %}
+                                <li>{{ skill|replace('_', ' ')|title }}</li>
+                            {% endfor %}
+                        </ul>
+                        
+                        <h5>Skills to Improve</h5>
+                        <ul>
+                            {% for skill in skills.improvementSkills %}
+                                <li>{{ skill|replace('_', ' ')|title }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>You haven't completed a skills assessment yet. Take our assessment to discover your strengths and areas for improvement!</p>
+                        <a href="/skill_assessment" class="btn btn-primary">Take Skills Assessment</a>
+                    {% endif %}
+                </div>
                 {% if skills and skills.proficientSkills %}
                     <div class="card-footer">
                         <a href="/skill_assessment" class="btn btn-outline-primary">Retake Assessment</a>
@@ -100,6 +98,7 @@
                         </div>
                     {% else %}
                         <p>Complete the skills assessment to receive personalized job recommendations.</p>
+                        <a href="/skill_assessment" class="btn btn-outline-success">Take Assessment</a>
                     {% endif %}
                 </div>
                 <div class="card-footer">
@@ -154,6 +153,7 @@
                         </div>
                     {% else %}
                         <p>No assessment history found. Take your first assessment to track your progress.</p>
+                        <a href="/skill_assessment" class="btn btn-info">Take Assessment</a>
                     {% endif %}
                 </div>
             </div>

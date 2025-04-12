@@ -38,7 +38,9 @@ def job_market_analysis():
 
 @app.route('/skill_assessment')
 def skill_assessment():
-    print("Session data:", session)
+    user_id = session.get('user_id', None)
+    print(f"Session data in skill_assessment route: {session}")
+    print(f"User ID from session: {user_id}")
     return render_template('skill_assessment.html')
 
 @app.route('/api/job_count_by_location')
@@ -360,11 +362,18 @@ def submit_quiz_results():
     if not data:
         return jsonify({"error": "No data provided"}), 400
     
+    session_user_id = session.get('user_id')
+    data_user_id = data.get('user_id')
+
     # Extract user_id if the user is logged in (you'll need to implement session management)
-    user_id = data.get('user_id')
-    print(12)
-    print(user_id)
-    
+    # user_id = data.get('user_id')
+    # print(12)
+    # print(user_id)
+    if session_user_id and (not data_user_id or data_user_id != session_user_id):
+        user_id = session_user_id
+        print(f"Using session user_id: {user_id} instead of data user_id: {data_user_id}")
+    else:
+        user_id = data_user_id
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -421,7 +430,7 @@ def signup():
         
         # Set user session
         session['user_id'] = user_id
-        session['user_name'] = name
+        session['user_email'] = email
         
         # Redirect to dashboard
         return redirect('/dashboard')
@@ -448,7 +457,7 @@ def login():
         
         # Set session - this is critical
         session['user_id'] = user_id
-        session['user_name'] = user['name']
+        session['user_email'] = email
         
         print("Session after login:", session)  # Debugging
         
@@ -466,6 +475,7 @@ def logout():
     return redirect('/')
 
 # Add dashboard route
+# Add dashboard route
 @app.route('/dashboard')
 def dashboard():
     # Check if user is logged in
@@ -475,9 +485,7 @@ def dashboard():
     # Get user information
     user_id = session['user_id']
     user = get_user_by_id(user_id)
-    print(user)
-
-
+    
     if not user:
         session.clear()
         return redirect('/login')
@@ -488,10 +496,27 @@ def dashboard():
     # Process skills data
     skills_data = {}
     try:
-        if user['skills_data']:
+        if user['skills_data'] and user['skills_data'].strip():
             skills_data = json.loads(user['skills_data'])
-    except:
+    except Exception as e:
+        print(f"Error parsing skills data: {e}")
         skills_data = {}
+    
+    # If the user has taken quizzes but we don't have skills data,
+    # try to extract it from their most recent quiz result
+    if not skills_data and quiz_results:
+        try:
+            most_recent = quiz_results[0]  # Assuming quiz_results is ordered by date
+            skills_data = {
+                "proficientSkills": json.loads(most_recent['proficient_skills']),
+                "improvementSkills": json.loads(most_recent['improvement_skills']),
+                "category": most_recent['category'],
+                "score": most_recent['score']
+            }
+        except Exception as e:
+            print(f"Error creating skills data from quiz results: {e}")
+    
+    print(f"User ID: {user_id}, Skills Data: {skills_data}")
     
     return render_template('dashboard.html', 
                           user=user, 
