@@ -1,1 +1,97 @@
 {% extends 'header.html' %}
+
+
+{% block content %}
+<div class="container">
+    {% if session and session.user_id %}
+    <input type="hidden" id="user-id" value="{{ session.user_id }}">
+    {% endif %}
+    
+    <div class="row">
+        <div class="col-md-8 offset-md-2 text-center" id="quiz-container">
+            <!-- Initial view with start button -->
+            <div id="start-view">
+                <h2 class="mb-4">Assess Your Skills</h2>
+                <p class="lead mb-4">
+                    Take our skill assessment to discover your strengths and opportunities for growth.
+                    Get personalized career recommendations based on your profile.
+                </p>
+                <button id="start-quiz-btn" class="btn btn-primary btn-lg">Start the Quiz</button>
+            </div>
+            
+            <!-- Category selection view (initially hidden) -->
+            <div id="category-view" style="display: none;">
+                <h3 class="mb-4">Select a Skill Category</h3>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card category-card" data-category="technical">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-code-slash"></i> Technical Skills</h5>
+                                <p class="card-text">Assess your programming, database, and technical knowledge.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card category-card" data-category="soft">
+                            <div class="card-body">
+                                <h5 class="card-title"><i class="bi bi-people"></i> Soft Skills</h5>
+                                <p class="card-text">Evaluate your communication, leadership, and problem-solving abilities.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quiz view (initially hidden) -->
+            <div id="quiz-view" style="display: none;">
+                <div class="progress mb-4">
+                    <div id="quiz-progress" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <h4 id="question-text" class="card-title mb-4"></h4>
+                        <div id="options-container" class="d-grid gap-2"></div>
+                    </div>
+                    <div class="card-footer">
+                        <span id="question-counter" class="text-muted"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Results view (initially hidden) -->
+            <div id="results-view" style="display: none;">
+                <h3 class="mb-4">Your Skill Assessment Results</h3>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4 class="mb-3">Your Skills Breakdown</h4>
+                        <div id="results-container"></div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-body" id="skill-mapping-container">
+                        <h4 class="mb-3">Your Skill Proficiency</h4>
+                        <p>Based on your assessment, you are proficient in:</p>
+                        <ul id="proficient-skills" class="mb-4"></ul>
+                        
+                        <p>Areas you could improve:</p>
+                        <ul id="improvement-skills"></ul>
+                    </div>
+                </div>
+                
+                <div class="card signup-prompt">
+                    <div class="card-body">
+                        <h4>Get Personalized Career Guidance</h4>
+                        <p>Sign up to receive tailored job recommendations and career advice based on your skills.</p>
+                        <button id="signup-btn" class="btn btn-success">Sign Up</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/skill_assessment.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends 'header.html' %}
+
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>Welcome, {{ user.name }}!</h2>
+            <p class="lead">Here's an overview of your skills and career progress.</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Skill Summary Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Your Skills Profile</h4>
+                </div>
+                <!-- Update the skill summary card in dashboard.html -->
+<div class="card-body">
+    {% if skills and skills.proficientSkills and skills.proficientSkills|length > 0 %}
+        <h5>Proficient Skills</h5>
+        <ul class="mb-4">
+            {% for skill in skills.proficientSkills %}
+                <li>{{ skill|replace('_', ' ')|title }}</li>
+            {% endfor %}
+        </ul>
+        
+        <h5>Skills to Improve</h5>
+        <ul>
+            {% for skill in skills.improvementSkills %}
+                <li>{{ skill|replace('_', ' ')|title }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No skill assessment data available. Take our skills assessment to get started!</p>
+        <a href="/skill_assessment" class="btn btn-primary">Take Skills Assessment</a>
+    {% endif %}
+</div>
+                {% if skills and skills.proficientSkills %}
+                    <div class="card-footer">
+                        <a href="/skill_assessment" class="btn btn-outline-primary">Retake Assessment</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Job Recommendations Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Job Recommendations</h4>
+                </div>
+                <div class="card-body">
+                    {% if skills and skills.proficientSkills and skills.proficientSkills|length > 0 %}
+                        <div id="job-recommendations">
+                            <p>Based on your skills, here are some recommended job roles:</p>
+                            <div class="list-group">
+                                {% if 'front_end' in skills.proficientSkills %}
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h5 class="mb-1">Front-End Developer</h5>
+                                            <small>98% match</small>
+                                        </div>
+                                        <p class="mb-1">Create user interfaces and interactive web applications.</p>
+                                    </a>
+                                {% endif %}
+                                
+                                {% if 'back_end' in skills.proficientSkills %}
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h5 class="mb-1">Back-End Developer</h5>
+                                            <small>95% match</small>
+                                        </div>
+                                        <p class="mb-1">Create server-side logic and APIs.</p>
+                                    </a>
+                                {% endif %}
+                                
+                                {% if 'database' in skills.proficientSkills %}
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h5 class="mb-1">Database Developer</h5>
+                                            <small>92% match</small>
+                                        </div>
+                                        <p class="mb-1">Design and optimize database systems.</p>
+                                    </a>
+                                {% endif %}
+                                
+                                {% if 'project_management' in skills.proficientSkills %}
+                                    <a href="#" class="list-group-item list-group-item-action">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h5 class="mb-1">Project Manager</h5>
+                                            <small>90% match</small>
+                                        </div>
+                                        <p class="mb-1">Lead technical projects and coordinate team efforts.</p>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <p>Complete the skills assessment to receive personalized job recommendations.</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="/job_market_analysis" class="btn btn-outline-success">Explore Job Market</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Previous Assessments Card -->
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">Assessment History</h4>
+                </div>
+                <div class="card-body">
+                    {% if quiz_results %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Category</th>
+                                        <th>Score</th>
+                                        <th>Proficient Skills</th>
+                                        <th>Skills to Improve</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for result in quiz_results %}
+                                        <tr>
+                                            <td>{{ result.completed_at }}</td>
+                                            <td>{{ result.category|title }}</td>
+                                            <td>{{ result.score }}%</td>
+                                            <td>
+                                                {% set proficient = result.proficient_skills|fromjson %}
+                                                {% for skill in proficient %}
+                                                    <span class="badge bg-success me-1">{{ skill|replace('_', ' ')|title }}</span>
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                {% set improvement = result.improvement_skills|fromjson %}
+                                                {% for skill in improvement %}
+                                                    <span class="badge bg-warning me-1">{{ skill|replace('_', ' ')|title }}</span>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p>No assessment history found. Take your first assessment to track your progress.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add custom filter to parse JSON in Jinja templates
+    function fromjson(value) {
+        try {
+            return JSON.parse(value);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // Register the filter
+    if (typeof Jinja2 !== 'undefined') {
+        Jinja2.filters.fromjson = fromjson;
+    }
+</script>
+{% endblock %}

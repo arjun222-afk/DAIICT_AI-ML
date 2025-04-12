@@ -1,10 +1,17 @@
 # app.py
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify,redirect
 import sqlite3
 import pandas as pd
 import json
 from datetime import datetime
 import re
+from auth_utils import register_user, login_user, get_user_by_id, get_user_quiz_results
+from flask import session, redirect, url_for, flash
+import json
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -13,6 +20,13 @@ def get_db_connection():
     conn = sqlite3.connect('job_market.db')
     conn.row_factory = sqlite3.Row
     return conn
+
+@app.template_filter('fromjson')
+def fromjson_filter(value):
+    try:
+        return json.loads(value)
+    except (ValueError, TypeError):
+        return []
 
 @app.route('/')
 def index():
@@ -24,6 +38,7 @@ def job_market_analysis():
 
 @app.route('/skill_assessment')
 def skill_assessment():
+    print("Session data:", session)
     return render_template('skill_assessment.html')
 
 @app.route('/api/job_count_by_location')
@@ -283,6 +298,260 @@ def market_summary():
         "unique_locations": location_count,
         "average_company_rating": round(avg_rating, 2) if avg_rating else 0
     })
+
+# Updated quiz questions endpoint to fetch from database
+@app.route('/api/quiz')
+def quiz_questions():
+    category = request.args.get('category', 'technical')
+    
+    # Connect to database and fetch questions
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, question, options, correct_answer, skill FROM quiz_questions WHERE category = ?",
+        (category,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    
+    # Format questions for API response
+    questions = []
+    for row in rows:
+        questions.append({
+            "id": row['id'],
+            "question": row['question'],
+            "options": json.loads(row['options']),
+            "correctAnswer": row['correct_answer'],
+            "skill": row['skill']
+        })
+    
+    # If no questions found in database, use fallback questions
+    if not questions:
+        if category == 'technical':
+            questions = [
+                {
+                    "id": 1,
+                    "question": "Which language is primarily used for web front-end development?",
+                    "options": ["Python", "JavaScript", "Java", "C++"],
+                    "correctAnswer": "JavaScript",
+                    "skill": "front_end"
+                },
+                # Additional fallback technical questions...
+            ]
+        else:
+            questions = [
+                {
+                    "id": 1,
+                    "question": "Which approach would be most effective when dealing with a disagreement in a team?",
+                    "options": ["Avoid the conflict altogether", "Listen to all perspectives and find a compromise", "Insist on your way if you believe it's right", "Let someone else make the decision"],
+                    "correctAnswer": "Listen to all perspectives and find a compromise",
+                    "skill": "conflict_resolution"
+                },
+                # Additional fallback soft skills questions...
+            ]
+    
+    return jsonify(questions)
+
+# Enhanced version of submit_quiz_results endpoint
+@app.route('/api/submit_quiz_results', methods=['POST'])
+def submit_quiz_results():
+    data = request.json
+    
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    # Extract user_id if the user is logged in (you'll need to implement session management)
+    user_id = data.get('user_id')
+    print(12)
+    print(user_id)
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert quiz results into database
+        cursor.execute("""
+            INSERT INTO user_quiz_results 
+            (user_id, category, proficient_skills, improvement_skills, score, completed_at) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            data.get('category'),
+            json.dumps(data.get('proficientSkills', [])),
+            json.dumps(data.get('improvementSkills', [])),
+            data.get('score'),
+            data.get('completedAt')
+        ))
+        
+        result_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            "success": True, 
+            "message": "Quiz results saved successfully",
+            "result_id": result_id
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# Add a secret key for session management
+# app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
+app.secret_key = os.environ.get('SECRET_KEY')
+
+# In app.py - Update the signup route
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        # Process the signup form
+        email = request.form.get('email')
+        password = request.form.get('password')
+        name = request.form.get('name')
+        
+        # Get stored skills from the form
+        user_skills = request.form.get('user_skills', '{}')
+        
+        # Register the user
+        user_id, error = register_user(name, email, password, user_skills)
+        
+        if error:
+            flash(error, 'danger')
+            return render_template('signup.html')  # This line is correct but missing flash messages in template
+        
+        # Set user session
+        session['user_id'] = user_id
+        session['user_name'] = name
+        
+        # Redirect to dashboard
+        return redirect('/dashboard')
+    
+    # GET request - show signup form
+    return render_template('signup.html')
+
+# Add login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # Authenticate user
+        user_id, error = login_user(email, password)
+        
+        if error:
+            flash(error, 'danger')
+            return render_template('login.html')
+        
+        # Get user info
+        user = get_user_by_id(user_id)
+        
+        # Set session - this is critical
+        session['user_id'] = user_id
+        session['user_name'] = user['name']
+        
+        print("Session after login:", session)  # Debugging
+        
+        # Redirect to dashboard
+        return redirect('/dashboard')
+    
+    # GET request - show login form
+    return render_template('login.html')
+
+# Add logout route
+@app.route('/logout')
+def logout():
+    # Clear session
+    session.clear()
+    return redirect('/')
+
+# Add dashboard route
+@app.route('/dashboard')
+def dashboard():
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    # Get user information
+    user_id = session['user_id']
+    user = get_user_by_id(user_id)
+    print(user)
+
+
+    if not user:
+        session.clear()
+        return redirect('/login')
+    
+    # Get user's quiz results
+    quiz_results = get_user_quiz_results(user_id)
+    
+    # Process skills data
+    skills_data = {}
+    try:
+        if user['skills_data']:
+            skills_data = json.loads(user['skills_data'])
+    except:
+        skills_data = {}
+    
+    return render_template('dashboard.html', 
+                          user=user, 
+                          skills=skills_data, 
+                          quiz_results=quiz_results)
+
+@app.route('/profile')
+def profile():
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    # Get user information
+    user_id = session['user_id']
+    user = get_user_by_id(user_id)
+    
+    if not user:
+        session.clear()
+        return redirect('/login')
+    
+    # Get user's quiz results
+    quiz_results = get_user_quiz_results(user_id)
+    
+    # Process skills data
+    skills_data = {}
+    try:
+        if user['skills_data']:
+            skills_data = json.loads(user['skills_data'])
+    except:
+        skills_data = {}
+    
+    return render_template('profile.html', 
+                          user=user, 
+                          skills=skills_data, 
+                          quiz_results=quiz_results)
+
+@app.route('/api/update_user_skills', methods=['POST'])
+def update_user_skills():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    data = request.json
+    user_id = session['user_id']
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Update the user's skills_data in the database
+        cursor.execute(
+            "UPDATE users SET skills_data = ? WHERE id = ?",
+            (json.dumps(data), user_id)
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
