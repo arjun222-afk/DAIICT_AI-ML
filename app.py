@@ -10,6 +10,8 @@ from flask import session, redirect, url_for, flash
 import json
 from dotenv import load_dotenv
 import os
+from ai_utils import get_resume_tips, get_interview_tips, format_tips_html
+import markdown
 
 load_dotenv()
 
@@ -601,6 +603,67 @@ def update_user_skills():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.template_filter('markdown')
+def markdown_filter(text):
+    return markdown.markdown(text)
+
+@app.route('/resume_tips')
+def resume_tips_page():
+    """Display the resume and interview tips page with job role selection"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    # Get all job roles from the database
+    conn = get_db_connection()
+    job_roles = conn.execute('SELECT * FROM job_roles ORDER BY role_name').fetchall()
+    conn.close()
+    
+    return render_template('resume_tips.html', 
+                          job_roles=job_roles,
+                          tips=None,
+                          current_role=None,
+                          tips_type=None)
+
+@app.route('/resume_tips/<int:role_id>/<tips_type>')
+def get_role_tips(role_id, tips_type):
+    
+    """Get tips for a specific job role and tips type"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    # Validate tips type
+    if tips_type not in ['resume', 'interview']:
+        return redirect('/resume_tips')
+    
+    # Get the job role details
+    conn = get_db_connection()
+    current_role = conn.execute('SELECT * FROM job_roles WHERE id = ?', 
+                              (role_id,)).fetchone()
+    
+    # Get all job roles for the dropdown
+    job_roles = conn.execute('SELECT * FROM job_roles ORDER BY role_name').fetchall()
+    conn.close()
+    
+    if not current_role:
+        return redirect('/resume_tips')
+    
+    # Get tips based on the job role and type
+    if tips_type == 'resume':
+        tips_md = get_resume_tips(current_role['role_name'])
+    else:  # interview tips
+        tips_md = get_interview_tips(current_role['role_name'])
+
+    # Format the tips as HTML with styling
+    tips = format_tips_html(tips_md)
+    
+    return render_template('resume_tips.html',
+                          job_roles=job_roles,
+                          tips=tips,
+                          current_role=current_role,
+                          tips_type=tips_type)
 
 if __name__ == '__main__':
     app.run(debug=True)

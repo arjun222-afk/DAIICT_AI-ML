@@ -1,0 +1,104 @@
+{% extends 'header.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Resume & Interview Tips</h1>
+    
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Select Job Role</h5>
+                </div>
+                <div class="card-body">
+                    <form id="roleForm">
+                        <div class="form-group mb-3">
+                            <label for="jobRoleSelect">Job Role</label>
+                            <select class="form-control" id="jobRoleSelect" name="role_id">
+                                <option value="">-- Select a role --</option>
+                                {% for role in job_roles %}
+                                <option value="{{ role.id }}">{{ role.role_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>Select Tips Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipsType" id="resumeTips" value="resume" checked>
+                                <label class="form-check-label" for="resumeTips">Resume Tips</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipsType" id="interviewTips" value="interview">
+                                <label class="form-check-label" for="interviewTips">Interview Tips</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Get Tips</button>
+                    </form>
+                </div>
+            </div>
+            
+            {% if current_role %}
+            <div class="card">
+                <div class="card-header">
+                    <h5>Selected Role</h5>
+                </div>
+                <div class="card-body">
+                    <h6>{{ current_role.title }}</h6>
+                    <p class="text-muted">{{ current_role.category }}</p>
+                    <p>{{ current_role.description }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>
+                        {% if tips_type == 'resume' %}
+                            Resume Tips
+                        {% elif tips_type == 'interview' %}
+                            Interview Tips
+                        {% else %}
+                            Tips & Suggestions
+                        {% endif %}
+                        
+                        {% if current_role %}
+                            for {{ current_role.title }}
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if tips %}
+                        <div class="tips-content">
+                            {{ tips|safe }}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            Select a job role and tips type to get personalized recommendations.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('roleForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const roleId = document.getElementById('jobRoleSelect').value;
+        const tipsType = document.querySelector('input[name="tipsType"]:checked').value;
+        
+        if (!roleId) {
+            alert('Please select a job role');
+            return;
+        }
+        
+        window.location.href = `/resume_tips/${roleId}/${tipsType}`;
+    });
+</script>
+{% endblock %}
