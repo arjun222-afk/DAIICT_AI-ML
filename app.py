@@ -859,10 +859,10 @@ def extract_skill_keyword(text):
 # Career Path Recommendation Route
 
 
-@app.route('/career_paths')
+from flask import request, flash
+
+@app.route('/career_paths', methods=['GET', 'POST'])
 def career_paths_page():
-    """Display the career paths recommendation page"""
-    # Check if user is logged in
     if 'user_id' not in session:
         return redirect('/login')
     
@@ -873,41 +873,81 @@ def career_paths_page():
         session.clear()
         return redirect('/login')
     
-    # Get user's skills data and quiz results
-    skills_data = {}
-    try:
-        if user['skills_data'] and user['skills_data'].strip():
-            skills_data = json.loads(user['skills_data'])
-    except Exception as e:
-        print(f"Error parsing skills data: {e}")
-        skills_data = {}
+    # Skills data container
+    skills_data = []
     
-    quiz_results = get_user_quiz_results(user_id)
+    # Handle skill submission
+    if request.method == 'POST':
+        input_skills = request.form.get('skills')
+        if input_skills:
+            try:
+                skills_list = [skill.strip().lower() for skill in input_skills.split(',') if skill.strip()]
+                skills_json = json.dumps(skills_list)
+                
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET skills_data = ? WHERE id = ?", (skills_json, user_id))
+                conn.commit()
+                conn.close()
+                
+                user['skills_data'] = skills_json  # Update user object
+                skills_data = skills_list
+                flash("Skills saved successfully.")
+            except Exception as e:
+                print(f"Error saving skills: {e}")
+                flash("Something went wrong while saving skills.")
     
-    # Check if user has taken any skill assessments
-    has_skill_data = bool(skills_data) or bool(quiz_results)
+    # Load skills from DB if not already loaded in this request
+    if not skills_data and user.get('skills_data'):
+        try:
+            if user['skills_data'].strip():
+                skills_data = json.loads(user['skills_data'])
+        except Exception as e:
+            print(f"Error parsing skills: {e}")
+            skills_data = []
     
-    # Get existing recommendations if available
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    has_skill_data = bool(skills_data)
     
-    # Get recommendations with career path details
-    cursor.execute("""
-        SELECT r.*, c.title, c.description, c.required_skills, c.growth_potential, 
-               c.market_demand, c.avg_salary, c.next_steps
-        FROM user_career_recommendations r
-        JOIN career_paths c ON r.career_path_id = c.id
-        WHERE r.user_id = ?
-        ORDER BY r.matching_score DESC
-    """, (user_id,))
-    
-    recommendations = [dict(row) for row in cursor.fetchall()]
-    conn.close()
+    # Matching careers
+    matched_careers = []
+    if has_skill_data:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM career_paths")
+        all_careers = cursor.fetchall()
+        conn.close()
+        
+        for career in all_careers:
+            try:
+                # Handle both JSON string and list formats
+                if isinstance(career['required_skills'], str):
+                    if career['required_skills'].startswith('['):
+                        required_skills = json.loads(career['required_skills'])
+                    else:
+                        required_skills = career['required_skills'].split(',')
+                else:
+                    required_skills = career['required_skills']
+                    
+                required_skills = [s.strip().lower() for s in required_skills]
+                
+                # Count matching skills
+                matching_skills = set(skills_data) & set(required_skills)
+                if matching_skills:
+                    career_dict = dict(career)
+                    career_dict['matching_skill_count'] = len(matching_skills)
+                    career_dict['matching_skills'] = list(matching_skills)
+                    matched_careers.append(career_dict)
+            except Exception as e:
+                print(f"Error processing career {career.get('title', 'unknown')}: {e}")
+        
+        # Sort by number of matching skills (descending)
+        matched_careers.sort(key=lambda c: c.get('matching_skill_count', 0), reverse=True)
     
     return render_template('career_paths.html',
                           user=user,
                           has_skill_data=has_skill_data,
-                          recommendations=recommendations)
+                          skills_data=skills_data,
+                          matched_careers=matched_careers)
 
 @app.route('/api/generate_career_recommendations', methods=['POST'])
 def generate_career_recommendations():
