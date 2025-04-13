@@ -38,6 +38,10 @@ def generate_network_html(graph, filename, title="Network Analysis", height="600
       "physics": {
         "barnesHut": {"gravitationalConstant": -80000, "springLength": 250},
         "stabilization": {"iterations": 1000}
+      },
+      "interaction": {
+        "hover": true,
+        "tooltipDelay": 200
       }
     }
     """)
@@ -51,6 +55,16 @@ def generate_network_html(graph, filename, title="Network Analysis", height="600
     
     # Return the relative path for the Flask template
     return f"networks/{filename}"
+
+def get_user_info(user_id):
+    """Get detailed information for a user"""
+    conn = get_db_connection()
+    user = conn.execute("""
+        SELECT id, name, email, job_role, skills_data 
+        FROM users WHERE id = ?
+    """, (user_id,)).fetchone()
+    conn.close()
+    return user
 
 def get_user_similarity_network():
     """
@@ -72,12 +86,18 @@ def get_user_similarity_network():
         user_name = user['name']
         
         # Add user node
+        user = get_user_info(user_id)
+        job_role = user['job_role'] if 'job_role' in user and user['job_role'] else "Not specified"
         G.add_node(f"user_{user_id}", 
-                  label=user_name,
-                  title=f"User: {user_name}",
-                  group="users",
-                  shape="circle",
-                  color="#4169E1")  # Royal Blue
+           label=user_name,
+           title=f"User: {user_name}",
+           group="users",
+           shape="circle",
+           color="#4169E1",
+           user_id=user_id,
+           user_name=user_name,
+           user_email=user['email'],
+           user_job_role=job_role)
         
         # Parse skills data
         try:
@@ -282,12 +302,18 @@ def get_full_network():
         user_name = user['name']
         
         # Add user node
+        user = get_user_info(user_id)
+        job_role = user['job_role'] if 'job_role' in user and user['job_role'] else "Not specified"
         G.add_node(f"user_{user_id}", 
-                  label=user_name,
-                  title=f"User: {user_name}",
-                  group="users",
-                  shape="circle",
-                  color="#4169E1")  # Royal Blue
+           label=user_name,
+           title=f"User: {user_name}",
+           group="users",
+           shape="circle",
+           color="#4169E1",
+           user_id=user_id,
+           user_name=user_name,
+           user_email=user['email'],
+           user_job_role=job_role)
         
         # Parse skills data
         try:
@@ -398,3 +424,75 @@ def get_full_network():
     conn.close()
     
     return G
+
+
+def get_shared_skills_connections():
+    """Generate data about users who share common skills"""
+    # Create graph for analysis
+    G = get_user_similarity_network()
+    
+    # Get database connection
+    conn = get_db_connection()
+    
+    # Dictionary to store user pairs and their shared skills
+    shared_skills_data = []
+    
+    # Get all user nodes from the graph
+    user_nodes = [node for node in G.nodes() if node.startswith('user_')]
+    
+    # Identify connected users (who share skills)
+    for i in range(len(user_nodes)):
+        for j in range(i+1, len(user_nodes)):
+            user1_id = user_nodes[i].replace('user_', '')
+            user2_id = user_nodes[j].replace('user_', '')
+            
+            # Check if these users are connected in the graph
+            if G.has_edge(user_nodes[i], user_nodes[j]):
+                # Get user details from database
+                user1 = conn.execute("SELECT name, email FROM users WHERE id = ?", (user1_id,)).fetchone()
+                user2 = conn.execute("SELECT name, email FROM users WHERE id = ?", (user2_id,)).fetchone()
+                
+                if not user1 or not user2:
+                    continue
+                
+                # Get skills for user1
+                user1_skills = set()
+                for neighbor in G.neighbors(user_nodes[i]):
+                    if neighbor.startswith('skill_'):
+                        user1_skills.add(neighbor.replace('skill_', ''))
+                
+                # Get skills for user2
+                user2_skills = set()
+                for neighbor in G.neighbors(user_nodes[j]):
+                    if neighbor.startswith('skill_'):
+                        user2_skills.add(neighbor.replace('skill_', ''))
+                
+                # Find shared skills
+                common_skills = user1_skills.intersection(user2_skills)
+                
+                # Only add pairs that actually share skills
+                if common_skills:
+                    shared_skills_data.append({
+                        "user1": {
+                            "id": user1_id,
+                            "name": user1['name'],
+                            "email": user1['email']
+                        },
+                        "user2": {
+                            "id": user2_id,
+                            "name": user2['name'],
+                            "email": user2['email']
+                        },
+                        "shared_skills": list(common_skills),
+                        "connection_strength": len(common_skills)
+                    })
+    
+    # Sort by connection strength (number of shared skills)
+    shared_skills_data.sort(key=lambda x: x["connection_strength"], reverse=True)
+    
+    conn.close()
+    return shared_skills_data
+
+
+
+

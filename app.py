@@ -10,7 +10,7 @@ from flask import session, redirect, url_for, flash
 import json
 from dotenv import load_dotenv
 from ai_utils import get_career_path_recommendations, save_user_recommendations
-from network_analysis import generate_network_html, get_user_similarity_network, get_skill_job_network, get_full_network
+from network_analysis import generate_network_html, get_user_similarity_network, get_skill_job_network, get_full_network, get_shared_skills_connections
 import os
 from pathlib import Path
 from ai_utils import get_resume_tips, get_interview_tips, format_tips_html
@@ -1239,7 +1239,382 @@ def skill_recommendations():
     except Exception as e:
         return jsonify({"error": str(e), "success": False}), 500
 
+# Get user connections for the network analysis page
+@app.route('/api/my_connections')
+def my_connections():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
 
+    user_id = session['user_id']
+    print(f"[DEBUG] Looking up connections for user_id: {user_id}")
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get current user's skills
+        user_row = cursor.execute("SELECT skills_data FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user_row:
+            print("[ERROR] No such user found.")
+            return jsonify({"success": True, "connections": []})
+
+        try:
+            user_skills_data = json.loads(user_row['skills_data']) if user_row['skills_data'] else {}
+            user_skills = set(s.lower().strip() for s in user_skills_data.get('proficientSkills', []))
+        except Exception as e:
+            print(f"[ERROR] Parsing current user's skills_data: {e}")
+            user_skills = set()
+
+        if not user_skills:
+            print("[INFO] No proficient skills found for this user.")
+            return jsonify({"success": True, "connections": []})
+
+        # Fetch all other users
+        other_users = cursor.execute("""
+            SELECT id, name, email, skills_data FROM users WHERE id != ?
+        """, (user_id,)).fetchall()
+
+        connections = []
+        for other in other_users:
+            try:
+                skills_data = json.loads(other['skills_data']) if other['skills_data'] else {}
+                other_skills = set(s.lower().strip() for s in skills_data.get('proficientSkills', []))
+                shared = user_skills & other_skills
+
+                if shared:
+                    connections.append({
+                        "id": other['id'],
+                        "username": other['name'],
+                        "email": other['email'],
+                        "skills": list(shared),
+                        "connection_strength": len(shared)
+                    })
+            except Exception as e:
+                print(f"[ERROR] Processing user {other['id']}: {e}")
+
+        print(f"[DEBUG] Total shared-skill connections found: {len(connections)}")
+        return jsonify({"success": True, "connections": connections})
+
+    except Exception as e:
+        import traceback
+        print("[FATAL] Unhandled exception:")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# Find potential connections based on shared skills
+@app.route('/api/find_connections')
+def find_connections():
+    """Find potential connections based on shared skills"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    user_id = session['user_id']
+    
+    try:
+        conn = get_db_connection()
+        
+        # Get the current user's skills
+        my_skills = conn.execute("""
+            SELECT DISTINCT qq.skill
+            FROM user_quiz_results uqr
+            JOIN quiz_questions qq ON uqr.question_id = qq.id
+            WHERE uqr.user_id = ? AND qq.skill IS NOT NULL AND qq.skill != ''
+        """, (user_id,)).fetchall()
+        
+        my_skill_list = [skill['skill'] for skill in my_skills]
+        
+        if not my_skill_list:
+            conn.close()
+            return jsonify({
+                "success": False,
+                "error": "You need to complete skill assessments before finding connections."
+            }), 400
+            
+        # Find users who share at least one skill but are not already connected
+        potential_connections = conn.execute("""
+            SELECT DISTINCT u.id, u.name, u.email
+            FROM users u
+            JOIN user_quiz_results uqr ON u.id = uqr.user_id
+            JOIN quiz_questions qq ON uqr.question_id = qq.id
+            WHERE u.id != ? 
+              AND qq.skill IN ({})
+              AND u.id NOT IN (
+                SELECT connected_user_id FROM user_connections WHERE user_id = ?
+                UNION
+                SELECT user_id FROM user_connections WHERE connected_user_id = ?
+              )
+            ORDER BY u.name
+        """.format(','.join(['?' for _ in my_skill_list])), 
+            [user_id] + my_skill_list + [user_id, user_id]).fetchall()
+        
+        # For each potential connection, find the shared skills
+        result = []
+        for connection in potential_connections:
+            # Get shared skills
+            shared_skills = conn.execute("""
+                SELECT DISTINCT qq.skill
+                FROM user_quiz_results uqr
+                JOIN quiz_questions qq ON uqr.question_id = qq.id
+                WHERE uqr.user_id = ? 
+                  AND qq.skill IN ({})
+                ORDER BY qq.skill
+            """.format(','.join(['?' for _ in my_skill_list])), 
+                [connection['id']] + my_skill_list).fetchall()
+            
+            shared_skill_list = [skill['skill'] for skill in shared_skills]
+            
+            result.append({
+                "id": connection['id'],
+                "username": connection['username'],
+                "email": connection['email'],
+                "shared_skills": shared_skill_list
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "suggestions": result
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+# Add a connection
+@app.route('/api/add_connection', methods=['POST'])
+def add_connection():
+    """Add a connection between users"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    user_id = session['user_id']
+    data = request.get_json()
+    
+    if not data or 'user_id' not in data:
+        return jsonify({"error": "Invalid request data", "success": False}), 400
+    
+    connected_user_id = data['user_id']
+    
+    if str(user_id) == str(connected_user_id):
+        return jsonify({"error": "Cannot connect with yourself", "success": False}), 400
+    
+    try:
+        conn = get_db_connection()
+        
+        # Check if user exists
+        user_exists = conn.execute("SELECT id FROM users WHERE id = ?", (connected_user_id,)).fetchone()
+        if not user_exists:
+            conn.close()
+            return jsonify({"error": "User not found", "success": False}), 404
+        
+        # Check if connection already exists
+        existing_connection = conn.execute("""
+            SELECT id FROM user_connections 
+            WHERE (user_id = ? AND connected_user_id = ?) 
+               OR (user_id = ? AND connected_user_id = ?)
+        """, (user_id, connected_user_id, connected_user_id, user_id)).fetchone()
+        
+        if existing_connection:
+            conn.close()
+            return jsonify({"error": "Connection already exists", "success": False}), 400
+        
+        # Create new connection
+        conn.execute("""
+            INSERT INTO user_connections (user_id, connected_user_id, status)
+            VALUES (?, ?, 'connected')
+        """, (user_id, connected_user_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Connection added successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+# Remove a connection
+@app.route('/api/remove_connection', methods=['POST'])
+def remove_connection():
+    """Remove a connection between users"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    user_id = session['user_id']
+    data = request.get_json()
+    
+    if not data or 'user_id' not in data:
+        return jsonify({"error": "Invalid request data", "success": False}), 400
+    
+    connected_user_id = data['user_id']
+    
+    try:
+        conn = get_db_connection()
+        
+        # Delete connection (checking both directions)
+        conn.execute("""
+            DELETE FROM user_connections 
+            WHERE (user_id = ? AND connected_user_id = ?) 
+               OR (user_id = ? AND connected_user_id = ?)
+        """, (user_id, connected_user_id, connected_user_id, user_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Connection removed successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+# Get user profile information
+@app.route('/api/user_profile')
+def user_profile():
+    """Get profile information for a specific user"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    current_user_id = session['user_id']
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return jsonify({"error": "User ID is required", "success": False}), 400
+    
+    try:
+        conn = get_db_connection()
+        
+        # Get user information
+        user = conn.execute("SELECT id, username, email FROM users WHERE id = ?", (user_id,)).fetchone()
+        
+        if not user:
+            conn.close()
+            return jsonify({"error": "User not found", "success": False}), 404
+        
+        # Get user skills
+        skills = conn.execute("""
+            SELECT DISTINCT qq.skill
+            FROM user_quiz_results uqr
+            JOIN quiz_questions qq ON uqr.question_id = qq.id
+            WHERE uqr.user_id = ? AND qq.skill IS NOT NULL AND qq.skill != ''
+            ORDER BY qq.skill
+        """, (user_id,)).fetchall()
+        
+        skill_list = [skill['skill'] for skill in skills]
+        
+        # Get current user's skills
+        my_skills = conn.execute("""
+            SELECT DISTINCT qq.skill
+            FROM user_quiz_results uqr
+            JOIN quiz_questions qq ON uqr.question_id = qq.id
+            WHERE uqr.user_id = ? AND qq.skill IS NOT NULL AND qq.skill != ''
+        """, (current_user_id,)).fetchall()
+        
+        my_skill_list = [skill['skill'] for skill in my_skills]
+        
+        # Find shared skills
+        shared_skills = list(set(skill_list) & set(my_skill_list))
+        
+        # Check if already connected
+        is_connected = conn.execute("""
+            SELECT id FROM user_connections 
+            WHERE (user_id = ? AND connected_user_id = ?) 
+               OR (user_id = ? AND connected_user_id = ?)
+        """, (current_user_id, user_id, user_id, current_user_id)).fetchone() is not None
+        
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "user": {
+                "id": user['id'],
+                "username": user['username'],
+                "email": user['email'],
+                "skills": skill_list
+            },
+            "shared_skills": shared_skills,
+            "is_connected": is_connected
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+    
+
+@app.route('/api/shared_skills_connections')
+def shared_skills_connections():
+    """API endpoint to get shared skills connections"""
+    # Check if user is logged in
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    try:
+        connections_data = get_shared_skills_connections()
+        
+        return jsonify({
+            "success": True,
+            "connections": connections_data
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+@app.route('/api/matching_jobs')
+def matching_jobs():
+    """Get jobs that match specified skills"""
+    if 'user_id' not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    # Get skills from query parameters (can be multiple)
+    skills = request.args.getlist('skill')
+    
+    if not skills:
+        return jsonify({
+            "success": False,
+            "error": "No skills specified"
+        }), 400
+    
+    try:
+        conn = get_db_connection()
+        
+        # Build a query to match jobs that require ANY of the specified skills
+        # This uses SQL's LIKE operator to search within comma-separated skill lists
+        placeholders = []
+        parameters = []
+        
+        for skill in skills:
+            # For each skill, create a LIKE condition to search for it within required_skills
+            # The % wildcards ensure it matches regardless of position in the comma-separated list
+            placeholders.append("required_skills LIKE ?")
+            parameters.append(f"%{skill}%")
+        
+        # Join placeholders with OR to match any of the skills
+        where_clause = " OR ".join(placeholders)
+        
+        # Get matching jobs
+        query = f"""
+            SELECT id, job_post, company, required_skills
+            FROM job_market_data
+            WHERE {where_clause}
+            ORDER BY job_post
+            LIMIT 10
+        """
+        
+        jobs = conn.execute(query, parameters).fetchall()
+        
+        # Convert to list of dictionaries
+        jobs_list = []
+        for job in jobs:
+            jobs_list.append({
+                "id": job['id'],
+                "job_post": job['job_post'],
+                "company": job['company'],
+                "required_skills": job['required_skills']
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "jobs": jobs_list,
+            "skills_searched": skills
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+    
+
+    
 
 
 

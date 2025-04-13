@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function startQuiz() {
+        localStorage.setItem("isAttemptingQuiz", true);
         categoryView.style.display = 'none';
         quizView.style.display = 'block';
         displayQuestion();

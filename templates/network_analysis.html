@@ -29,8 +29,110 @@
                                 Full Network
                             </button>
                         </li>
+                        <!-- Update the nav-tabs section in network_analysis.html by adding a new tab -->
+<ul class="nav nav-tabs card-header-tabs" id="network-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="user-skill-tab" data-bs-toggle="tab" data-bs-target="#user-skill" 
+            type="button" role="tab" aria-controls="user-skill" aria-selected="true">
+            User Similarity Network
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="skill-job-tab" data-bs-toggle="tab" data-bs-target="#skill-job" 
+            type="button" role="tab" aria-controls="skill-job" aria-selected="false">
+            Skills & Jobs Network
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="full-network-tab" data-bs-toggle="tab" data-bs-target="#full-network" 
+            type="button" role="tab" aria-controls="full-network" aria-selected="false">
+            Full Network
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="connections-tab" data-bs-toggle="tab" data-bs-target="#connections" 
+            type="button" role="tab" aria-controls="connections" aria-selected="false">
+            User Connections
+        </button>
+    </li>
+</ul>
+
+<!-- Add a new tab pane for connections -->
+<div class="tab-pane fade" id="connections" role="tabpanel" aria-labelledby="connections-tab">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h3>User Connections Analysis</h3>
+            <p>This view shows users who share common skills and the specific skills they have in common.</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-primary" id="refresh-connections">
+                <i class="bi bi-arrow-clockwise"></i> Refresh Connections
+            </button>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Users With Shared Skills</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="shared-skills-table">
+                    <thead>
+                        <tr>
+                            <th>User 1</th>
+                            <th>User 2</th>
+                            <th>Shared Skills</th>
+                            <th>Connection Strength</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shared-skills-tbody">
+                        <tr>
+                            <td colspan="5" class="text-center">Loading connections data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
                     </ul>
                 </div>
+                <!-- Add this HTML for the user info panel -->
+<div class="modal fade" id="userInfoModal" tabindex="-1" aria-labelledby="userInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="userInfoModalLabel">User Information</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex justify-content-center mb-3">
+            <div class="user-avatar">
+              <i class="bi bi-person-circle" style="font-size: 3rem;"></i>
+            </div>
+          </div>
+          <h4 id="user-name" class="text-center mb-3"></h4>
+          <div class="user-details">
+            <p><strong>Email:</strong> <span id="user-email"></span></p>
+            <p><strong>Job Role:</strong> <span id="user-job-role"></span></p>
+            <p><strong>Skills:</strong></p>
+            <div id="user-skills" class="d-flex flex-wrap gap-1 mb-3">
+              <!-- Skills will be added here dynamically -->
+            </div>
+          </div>
+          <div id="connection-actions" class="text-center mt-3">
+            <!-- Connection buttons will be added here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <a id="view-full-profile" href="#" class="btn btn-primary">View Full Profile</a>
+        </div>
+      </div>
+    </div>
+  </div>
                 <div class="card-body">
                     <div class="tab-content" id="network-tab-content">
                         <!-- User Similarity Network -->
@@ -283,4 +385,49 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Load shared skills when "User Connections" tab is clicked
+        document.getElementById("connections-tab").addEventListener("click", function () {
+            fetchConnections();
+        });
+    
+        // Also bind the Refresh button
+        document.getElementById("refresh-connections").addEventListener("click", function () {
+            fetchConnections();
+        });
+    
+        function fetchConnections() {
+            const tbody = document.getElementById("shared-skills-tbody");
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center">Loading connections...</td></tr>`;
+    
+            fetch('/api/my_connections')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.connections.length > 0) {
+                        let rows = "";
+                        data.connections.forEach(conn => {
+                            const sharedSkills = conn.skills.join(", ");
+                            rows += `
+                                <tr>
+                                    <td>${conn.username}</td>
+                                    <td>You</td>
+                                    <td>${sharedSkills}</td>
+                                    <td>${conn.skills.length}</td>
+                                    <td><button class="btn btn-sm btn-info" data-email="${conn.email}" data-name="${conn.username}" data-skills='${JSON.stringify(conn.skills)}'>View</button></td>
+                                </tr>`;
+                        });
+                        tbody.innerHTML = rows;
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="5" class="text-center">No connections found.</td></tr>`;
+                    }
+                })
+                .catch(error => {
+                    console.error("Error loading connections:", error);
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-danger text-center">Error loading connections</td></tr>`;
+                });
+        }
+    });
+    </script>
+    
 {% endblock %}

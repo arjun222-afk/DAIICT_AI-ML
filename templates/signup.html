@@ -56,8 +56,11 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        if(!localStorage.getItem("isAttemptingQuiz")){
+            localStorage.clear();
+        }
         const userSkills = JSON.parse(localStorage.getItem('userSkills') || '{}');
-        
+        console.log(userSkills)
         document.getElementById('user_skills').value = JSON.stringify(userSkills);
         
         // const proficientList = document.getElementById('proficient-display');
